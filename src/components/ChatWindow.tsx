@@ -3,10 +3,11 @@ import { fetchHistory, sendMessage } from "../lib/api";
 import type { ChatMessage } from "../types/chat";
 
 type ChatWindowProps = {
+  agentId: string;
   sessionId: string;
 };
 
-export function ChatWindow({ sessionId }: ChatWindowProps) {
+export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export function ChatWindow({ sessionId }: ChatWindowProps) {
     setMessages((current) => [...current, optimisticUser]);
 
     try {
-      const result = await sendMessage({ sessionId, message: text });
+      const result = await sendMessage({ agentId, sessionId, message: text });
       setMessages(result.session.messages);
     } catch (err) {
       setError(String(err));
@@ -75,7 +76,11 @@ export function ChatWindow({ sessionId }: ChatWindowProps) {
     <main className="chat-shell">
       <header className="chat-header">
         <h1>Project Agent Demo</h1>
-        <p>OpenClaw-style data flow: UI → API → Service → Embedded Runtime</p>
+        <p>
+          OpenClaw-style data flow: UI → API → Service → Embedded Runtime
+          <br />
+          Agent: <strong>{agentId}</strong>
+        </p>
       </header>
 
       <section className="chat-log" aria-live="polite">

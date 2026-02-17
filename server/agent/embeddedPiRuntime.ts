@@ -1,62 +1,76 @@
 import { randomUUID } from "node:crypto";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import { AgentSessionStore } from "./agentSessionStore.js";
 import type { AgentRuntime, AgentRuntimeRequest, AgentRuntimeResponse } from "./types.js";
 
-type PiSessionLike = {
-  settings?: {
-    model?: string;
-  };
-  messages?: Array<{ role: string; content: unknown }>;
-};
+function extractText(message: AgentMessage | undefined): string {
+  if (!message || message.role !== "assistant") {
+    return "";
+  }
 
-// This adapter intentionally keeps the API surface small and resilient.
-// It uses dynamic imports so the project can run even when PI setup is incomplete.
+  const content = message.content;
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => {
+        if (!block || typeof block !== "object") {
+          return "";
+        }
+        if ((block as { type?: string }).type === "text") {
+          const text = (block as { text?: unknown }).text;
+          return typeof text === "string" ? text : "";
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
+
 export class EmbeddedPiRuntime implements AgentRuntime {
   name = "embedded-pi";
 
+  constructor(private sessionStore: AgentSessionStore) {}
+
   async run(input: AgentRuntimeRequest): Promise<AgentRuntimeResponse> {
     try {
-      const piCodingAgent = (await import("@mariozechner/pi-coding-agent")) as Record<string, any>;
-      const createAgentSession =
-        typeof piCodingAgent.createAgentSession === "function"
-          ? piCodingAgent.createAgentSession
-          : null;
+      const record = await this.sessionStore.getOrCreate(input.agentId);
+      const beforeCount = record.session.state.messages.length;
 
-      if (!createAgentSession) {
-        throw new Error("createAgentSession not found in @mariozechner/pi-coding-agent");
-      }
+      await record.session.prompt(input.message, {
+        expandPromptTemplates: false,
+      });
 
-      const session = (await createAgentSession({})) as PiSessionLike;
-      session.settings = {
-        ...(session.settings ?? {}),
-        model: process.env.PI_MODEL ?? "gpt-4.1-mini",
-      };
+      const nextMessages = record.session.state.messages.slice(beforeCount);
+      const lastAssistant = [...nextMessages].reverse().find((message) => message.role === "assistant");
+      const assistantText = extractText(lastAssistant) || "Agent completed with no assistant text.";
 
-      session.messages = [
-        ...(session.messages ?? []),
-        ...input.conversation.map((turn) => ({ role: turn.role, content: turn.text })),
-        { role: "user", content: input.message },
-      ];
-
-      // In a full integration this would call the actual PI run/stream method.
-      // For now, we emit a deterministic placeholder while preserving adapter boundaries.
       return {
         runId: randomUUID(),
         status: "completed",
-        assistantText:
-          "Embedded PI adapter is wired. Next step: call the real PI run API and stream tokens back to the UI.",
+        assistantText,
         diagnostics: {
           adapter: this.name,
-          model: session.settings.model,
-          note: "Scaffold mode",
+          agentId: input.agentId,
+          piSessionId: record.session.sessionId,
+          toolsEnabled: 0,
+          emittedMessages: nextMessages.length,
         },
       };
     } catch (err) {
       return {
         runId: randomUUID(),
         status: "failed",
-        assistantText: "Embedded PI runtime failed to initialize. Falling back is recommended.",
+        assistantText: "Embedded PI runtime failed.",
         diagnostics: {
           adapter: this.name,
+          agentId: input.agentId,
           error: String(err),
         },
       };

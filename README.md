@@ -9,7 +9,8 @@ Minimal scaffold for learning OpenClaw-style agent architecture by building it e
 - Chat service layer with session state and run IDs
 - Runtime adapter boundary:
   - `mock` runtime (default, works out of the box)
-  - `embedded-pi` runtime scaffold for `@mariozechner/pi-*`
+  - `embedded-pi` runtime scaffold for `@mariozechner/pi-*` (`tools: []`)
+- Per-agent PI session store keyed by `agentId`
 - Architecture docs showing data flow and next implementation steps
 
 ## Quick start
@@ -36,7 +37,7 @@ Try embedded PI scaffold mode:
 AGENT_RUNTIME=embedded-pi pnpm dev:server
 ```
 
-Note: `embedded-pi` currently validates adapter wiring and returns scaffold output. The final streaming PI run call is the next step.
+Note: `embedded-pi` now executes a basic PI turn with no tools and keeps one in-memory PI session per `agentId`.
 
 ## Scripts
 

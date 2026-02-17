@@ -1,4 +1,5 @@
 export type AgentRuntimeRequest = {
+  agentId: string;
   sessionId: string;
   message: string;
   conversation: Array<{ role: "user" | "assistant" | "system"; text: string }>;

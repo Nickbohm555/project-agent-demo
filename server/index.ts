@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { buildRuntime } from "./agent/runtimeFactory.js";
+import { buildRuntimeContext } from "./agent/runtimeFactory.js";
 import { ChatService } from "./chat/chatService.js";
 import { buildChatRouter } from "./chat/chatRouter.js";
 
@@ -10,11 +10,15 @@ const port = Number(process.env.PORT ?? 3001);
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-const runtime = buildRuntime();
+const { runtime, sessionStore } = buildRuntimeContext();
 const chatService = new ChatService(runtime);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, runtime: runtime.name });
+});
+
+app.get("/api/agents/sessions", (_req, res) => {
+  res.json({ sessions: sessionStore.list() });
 });
 
 app.use("/api/chat", buildChatRouter(chatService));

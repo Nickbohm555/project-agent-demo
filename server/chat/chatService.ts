@@ -28,7 +28,7 @@ export class ChatService {
     return created;
   }
 
-  async sendMessage(sessionId: string, message: string) {
+  async sendMessage(agentId: string, sessionId: string, message: string) {
     const session = this.getSession(sessionId);
     const now = new Date().toISOString();
 
@@ -41,6 +41,7 @@ export class ChatService {
     session.messages.push(userMessage);
 
     const run = await this.runtime.run({
+      agentId,
       sessionId,
       message,
       conversation: session.messages.map((item) => ({ role: item.role, text: item.text })),

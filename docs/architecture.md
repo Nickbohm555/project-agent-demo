@@ -13,6 +13,8 @@ React Chat UI
       -> ChatService appends user message
         -> AgentRuntime.run(...)
           -> MockAgentRuntime OR EmbeddedPiRuntime
+            -> AgentSessionStore.getOrCreate(agentId)
+              -> one PI AgentSession per agent
         -> ChatService appends assistant message
   <- returns session + run status
 
@@ -40,7 +42,8 @@ React Chat UI
 
 4. Runtime layer (`server/agent/*`)
 - `MockAgentRuntime`: deterministic local behavior
-- `EmbeddedPiRuntime`: integration seam for `@mariozechner/pi-*`
+- `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with `tools: []`
+- `AgentSessionStore`: keeps one in-memory PI session per `agentId`
 
 ## OpenClaw concept mapping
 
@@ -48,11 +51,12 @@ React Chat UI
 - OpenClaw run IDs + run status -> `run.id` + `run.status`
 - OpenClaw embedded PI runner boundary -> `AgentRuntime` interface
 - OpenClaw session transcript management -> `ChatService` in-memory session map
+- Per-agent runtime sessions -> `AgentSessionStore` map keyed by `agentId`
 
 ## Next build steps
 
-1. Replace scaffold output in `EmbeddedPiRuntime` with actual PI session run/stream calls.
-2. Add streaming endpoint (SSE or WebSocket) for token deltas.
-3. Move session store from memory to SQLite/file-backed store.
+1. Add streaming endpoint (SSE or WebSocket) for token deltas from PI events.
+2. Add run queue per `sessionId`/`agentId` to serialize overlapping sends.
+3. Move session stores from memory to SQLite/file-backed store.
 4. Add tool execution adapter and tool event stream.
 5. Add auth + multi-session management.

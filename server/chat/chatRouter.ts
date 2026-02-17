@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ChatService } from "./chatService.js";
 
 const sendRequestSchema = z.object({
+  agentId: z.string().min(1),
   sessionId: z.string().min(1),
   message: z.string().min(1),
 });
@@ -23,7 +24,11 @@ export function buildChatRouter(chatService: ChatService): Router {
       return;
     }
 
-    const result = await chatService.sendMessage(parsed.data.sessionId, parsed.data.message);
+    const result = await chatService.sendMessage(
+      parsed.data.agentId,
+      parsed.data.sessionId,
+      parsed.data.message,
+    );
     res.json(result);
   });
 

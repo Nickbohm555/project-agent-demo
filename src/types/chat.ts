@@ -13,6 +13,7 @@ export type ChatSession = {
 };
 
 export type SendChatRequest = {
+  agentId: string;
   sessionId: string;
   message: string;
 };

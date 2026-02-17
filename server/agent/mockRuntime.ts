@@ -22,6 +22,7 @@ export class MockAgentRuntime implements AgentRuntime {
         .join("\n\n"),
       diagnostics: {
         adapter: this.name,
+        agentId: input.agentId,
         contextSize: input.conversation.length,
       },
     };
