@@ -44,6 +44,7 @@ React Chat UI
 - `MockAgentRuntime`: deterministic local behavior
 - `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with `tools: []`
 - `AgentSessionStore`: keeps one in-memory PI session per `agentId`
+- `modelConfig`: resolves provider/model/thinking + required API key env readiness
 
 ## OpenClaw concept mapping
 
@@ -52,6 +53,7 @@ React Chat UI
 - OpenClaw embedded PI runner boundary -> `AgentRuntime` interface
 - OpenClaw session transcript management -> `ChatService` in-memory session map
 - Per-agent runtime sessions -> `AgentSessionStore` map keyed by `agentId`
+- Provider/model runtime preflight -> `/api/agent/runtime` and `/api/health`
 
 ## Next build steps
 

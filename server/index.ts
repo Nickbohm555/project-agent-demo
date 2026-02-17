@@ -10,15 +10,28 @@ const port = Number(process.env.PORT ?? 3001);
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-const { runtime, sessionStore } = buildRuntimeContext();
+const { runtime, sessionStore, modelConfig } = buildRuntimeContext();
 const chatService = new ChatService(runtime);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, runtime: runtime.name });
+  res.json({
+    ok: true,
+    runtime: runtime.name,
+    model: `${modelConfig.provider}/${modelConfig.modelId}`,
+    thinkingLevel: modelConfig.thinkingLevel,
+    hasRequiredApiKey: modelConfig.hasRequiredApiKey,
+  });
 });
 
 app.get("/api/agents/sessions", (_req, res) => {
   res.json({ sessions: sessionStore.list() });
+});
+
+app.get("/api/agent/runtime", (_req, res) => {
+  res.json({
+    runtime: runtime.name,
+    modelConfig,
+  });
 });
 
 app.use("/api/chat", buildChatRouter(chatService));

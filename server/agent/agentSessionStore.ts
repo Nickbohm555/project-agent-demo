@@ -1,5 +1,6 @@
 import { createAgentSession, SessionManager, type AgentSession } from "@mariozechner/pi-coding-agent";
-import { getModel, type KnownProvider } from "@mariozechner/pi-ai";
+import { getModel } from "@mariozechner/pi-ai";
+import type { AgentModelConfig } from "./modelConfig.js";
 
 type SessionRecord = {
   agentId: string;
@@ -11,6 +12,8 @@ type SessionRecord = {
 export class AgentSessionStore {
   private records = new Map<string, SessionRecord>();
 
+  constructor(private modelConfig: AgentModelConfig) {}
+
   async getOrCreate(agentId: string): Promise<SessionRecord> {
     const existing = this.records.get(agentId);
     if (existing) {
@@ -18,12 +21,11 @@ export class AgentSessionStore {
       return existing;
     }
 
-    const provider = (process.env.PI_PROVIDER ?? "openai") as KnownProvider;
-    const modelId = process.env.PI_MODEL ?? "gpt-4.1-mini";
-    const model = getModel(provider, modelId as never);
+    const model = getModel(this.modelConfig.provider, this.modelConfig.modelId as never);
 
     const { session } = await createAgentSession({
       model,
+      thinkingLevel: this.modelConfig.thinkingLevel,
       tools: [],
       sessionManager: SessionManager.inMemory(process.cwd()),
       cwd: process.cwd(),
@@ -49,6 +51,8 @@ export class AgentSessionStore {
       piSessionId: record.session.sessionId,
       isStreaming: record.session.isStreaming,
       messages: record.session.messages.length,
+      model: `${this.modelConfig.provider}/${this.modelConfig.modelId}`,
+      thinkingLevel: this.modelConfig.thinkingLevel,
     }));
   }
 }

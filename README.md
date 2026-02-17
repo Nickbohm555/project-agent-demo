@@ -8,8 +8,8 @@ Minimal scaffold for learning OpenClaw-style agent architecture by building it e
 - API layer (`/api/chat/history`, `/api/chat/send`)
 - Chat service layer with session state and run IDs
 - Runtime adapter boundary:
-  - `mock` runtime (default, works out of the box)
-  - `embedded-pi` runtime scaffold for `@mariozechner/pi-*` (`tools: []`)
+  - `embedded-pi` runtime (default) for `@mariozechner/pi-*` (`tools: []`)
+  - optional `mock` runtime for offline/local testing
 - Per-agent PI session store keyed by `agentId`
 - Architecture docs showing data flow and next implementation steps
 
@@ -23,21 +23,44 @@ pnpm dev
 - Web app: `http://localhost:5173`
 - API server: `http://localhost:3001`
 
-## Runtime modes
+## Runtime mode and model config
 
-Default mode is mock:
+Default mode is embedded PI:
 
 ```bash
 pnpm dev
 ```
 
-Try embedded PI scaffold mode:
+Use mock mode only when needed:
 
 ```bash
-AGENT_RUNTIME=embedded-pi pnpm dev:server
+AGENT_RUNTIME=mock pnpm dev:server
 ```
 
-Note: `embedded-pi` now executes a basic PI turn with no tools and keeps one in-memory PI session per `agentId`.
+`embedded-pi` executes a basic PI turn with no tools and keeps one in-memory PI session per `agentId`.
+
+### Required env for real model calls
+
+```bash
+# Runtime selection (optional; default is embedded-pi)
+AGENT_RUNTIME=embedded-pi
+
+# Model selection
+PI_PROVIDER=openai
+PI_MODEL=gpt-4.1-mini
+PI_THINKING_LEVEL=off
+
+# API key (required for PI provider call)
+OPENAI_API_KEY=your_key_here
+```
+
+Provider key mapping is exposed in `GET /api/agent/runtime`.
+Readiness quick check:
+
+```bash
+curl -s http://localhost:3001/api/agent/runtime
+curl -s http://localhost:3001/api/health
+```
 
 ## Scripts
 

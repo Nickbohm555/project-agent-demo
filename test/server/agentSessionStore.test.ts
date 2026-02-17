@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createAgentSessionMock = vi.fn();
 const inMemoryMock = vi.fn(() => ({ kind: "memory-session-manager" }));
 const getModelMock = vi.fn(() => ({ provider: "openai", id: "gpt-4.1-mini" }));
+const modelConfig = {
+  provider: "openai",
+  modelId: "gpt-4.1-mini",
+  thinkingLevel: "off",
+  requiredApiKeyEnv: ["OPENAI_API_KEY"],
+  hasRequiredApiKey: true,
+} as const;
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession: createAgentSessionMock,
@@ -32,7 +39,7 @@ describe("AgentSessionStore", () => {
     });
 
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
-    const store = new AgentSessionStore();
+    const store = new AgentSessionStore(modelConfig);
 
     const first = await store.getOrCreate("agent-a");
     const second = await store.getOrCreate("agent-a");
@@ -61,7 +68,7 @@ describe("AgentSessionStore", () => {
       });
 
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
-    const store = new AgentSessionStore();
+    const store = new AgentSessionStore(modelConfig);
 
     const a = await store.getOrCreate("agent-a");
     const b = await store.getOrCreate("agent-b");
