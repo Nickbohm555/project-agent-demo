@@ -62,6 +62,8 @@ curl -s http://localhost:3001/api/agent/runtime
 curl -s http://localhost:3001/api/health
 ```
 
+The server auto-loads `.env` from the project root on startup.
+
 ## Scripts
 
 - `pnpm dev`: run web + server together
