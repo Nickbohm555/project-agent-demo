@@ -1,0 +1,159 @@
+:root {
+  --bg: #f4f0ea;
+  --surface: #fffefc;
+  --ink: #1d1b18;
+  --accent: #d95d39;
+  --assistant: #efe4d8;
+  --user: #d7e9f2;
+  --error: #b22a1d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 10%, #ffdfba 0%, transparent 35%),
+    radial-gradient(circle at 80% 90%, #bdd9ff 0%, transparent 30%),
+    var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.chat-shell {
+  max-width: 840px;
+  margin: 0 auto;
+  background: color-mix(in oklab, var(--surface) 92%, white);
+  border: 1px solid #d0c8be;
+  border-radius: 16px;
+  box-shadow: 0 24px 50px rgb(0 0 0 / 8%);
+  overflow: hidden;
+}
+
+.chat-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2dcd3;
+}
+
+.chat-header h1 {
+  margin: 0;
+  font-family: "Space Grotesk", "Avenir Next", sans-serif;
+}
+
+.chat-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+.chat-log {
+  padding: 1rem;
+  min-height: 52vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: auto;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #d8d2c8;
+}
+
+.bubble p {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.bubble time {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.bubble .role {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.bubble-user {
+  align-self: flex-end;
+  background: var(--user);
+}
+
+.bubble-assistant,
+.bubble-system {
+  align-self: flex-start;
+  background: var(--assistant);
+}
+
+.status {
+  opacity: 0.7;
+}
+
+.chat-compose {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid #e2dcd3;
+}
+
+.chat-compose textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #c9c1b7;
+  padding: 0.7rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.chat-compose button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  padding: 0.8rem 1rem;
+}
+
+.chat-compose button:disabled {
+  opacity: 0.5;
+}
+
+.error {
+  margin: 0;
+  padding: 0 1rem 1rem;
+  color: var(--error);
+}
+
+@media (max-width: 700px) {
+  #root {
+    padding: 0.5rem;
+  }
+
+  .chat-shell {
+    border-radius: 10px;
+  }
+
+  .chat-compose {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-compose button {
+    width: 100%;
+  }
+
+  .bubble {
+    max-width: 100%;
+  }
+}
