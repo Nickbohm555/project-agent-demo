@@ -1,6 +1,7 @@
 import { createAgentSession, SessionManager, type AgentSession } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
 import type { AgentModelConfig } from "./modelConfig.js";
+import { buildAgentTools, type AgentToolConfig } from "./toolConfig.js";
 
 type SessionRecord = {
   agentId: string;
@@ -12,7 +13,10 @@ type SessionRecord = {
 export class AgentSessionStore {
   private records = new Map<string, SessionRecord>();
 
-  constructor(private modelConfig: AgentModelConfig) {}
+  constructor(
+    private modelConfig: AgentModelConfig,
+    private toolConfig: AgentToolConfig,
+  ) {}
 
   async getOrCreate(agentId: string): Promise<SessionRecord> {
     const existing = this.records.get(agentId);
@@ -26,7 +30,7 @@ export class AgentSessionStore {
     const { session } = await createAgentSession({
       model,
       thinkingLevel: this.modelConfig.thinkingLevel,
-      tools: [],
+      tools: buildAgentTools(this.toolConfig),
       sessionManager: SessionManager.inMemory(process.cwd()),
       cwd: process.cwd(),
     });
@@ -51,6 +55,10 @@ export class AgentSessionStore {
       piSessionId: record.session.sessionId,
       isStreaming: record.session.isStreaming,
       messages: record.session.messages.length,
+      activeTools:
+        typeof record.session.getActiveToolNames === "function"
+          ? record.session.getActiveToolNames()
+          : [],
       model: `${this.modelConfig.provider}/${this.modelConfig.modelId}`,
       thinkingLevel: this.modelConfig.thinkingLevel,
     }));

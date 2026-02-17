@@ -42,9 +42,10 @@ React Chat UI
 
 4. Runtime layer (`server/agent/*`)
 - `MockAgentRuntime`: deterministic local behavior
-- `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with `tools: []`
+- `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with optional CLI `bash` tool
 - `AgentSessionStore`: keeps one in-memory PI session per `agentId`
 - `modelConfig`: resolves provider/model/thinking + required API key env readiness
+- `toolConfig`: toggles CLI `bash` tool and optional command prefix allowlist
 
 ## OpenClaw concept mapping
 

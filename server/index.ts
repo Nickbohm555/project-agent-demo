@@ -12,7 +12,7 @@ const envResult = loadEnvironmentFromDotenv();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-const { runtime, sessionStore, modelConfig } = buildRuntimeContext();
+const { runtime, sessionStore, modelConfig, toolConfig } = buildRuntimeContext();
 const chatService = new ChatService(runtime);
 
 app.get("/api/health", (_req, res) => {
@@ -22,6 +22,7 @@ app.get("/api/health", (_req, res) => {
     model: `${modelConfig.provider}/${modelConfig.modelId}`,
     thinkingLevel: modelConfig.thinkingLevel,
     hasRequiredApiKey: modelConfig.hasRequiredApiKey,
+    cliToolEnabled: toolConfig.cliToolEnabled,
   });
 });
 
@@ -33,6 +34,7 @@ app.get("/api/agent/runtime", (_req, res) => {
   res.json({
     runtime: runtime.name,
     modelConfig,
+    toolConfig,
   });
 });
 

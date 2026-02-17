@@ -10,6 +10,12 @@ const modelConfig = {
   requiredApiKeyEnv: ["OPENAI_API_KEY"],
   hasRequiredApiKey: true,
 } as const;
+const toolConfig = {
+  cliToolEnabled: false,
+  cliWorkdir: process.cwd(),
+  cliTimeoutSeconds: 45,
+  cliAllowedPrefixes: [],
+} as const;
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession: createAgentSessionMock,
@@ -39,7 +45,7 @@ describe("AgentSessionStore", () => {
     });
 
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
-    const store = new AgentSessionStore(modelConfig);
+    const store = new AgentSessionStore(modelConfig, toolConfig);
 
     const first = await store.getOrCreate("agent-a");
     const second = await store.getOrCreate("agent-a");
@@ -68,7 +74,7 @@ describe("AgentSessionStore", () => {
       });
 
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
-    const store = new AgentSessionStore(modelConfig);
+    const store = new AgentSessionStore(modelConfig, toolConfig);
 
     const a = await store.getOrCreate("agent-a");
     const b = await store.getOrCreate("agent-b");

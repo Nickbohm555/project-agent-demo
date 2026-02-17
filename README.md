@@ -8,7 +8,7 @@ Minimal scaffold for learning OpenClaw-style agent architecture by building it e
 - API layer (`/api/chat/history`, `/api/chat/send`)
 - Chat service layer with session state and run IDs
 - Runtime adapter boundary:
-  - `embedded-pi` runtime (default) for `@mariozechner/pi-*` (`tools: []`)
+  - `embedded-pi` runtime (default) for `@mariozechner/pi-*` (starts with no tools; optional CLI tool)
   - optional `mock` runtime for offline/local testing
 - Per-agent PI session store keyed by `agentId`
 - Architecture docs showing data flow and next implementation steps
@@ -37,7 +37,7 @@ Use mock mode only when needed:
 AGENT_RUNTIME=mock pnpm dev:server
 ```
 
-`embedded-pi` executes a basic PI turn with no tools and keeps one in-memory PI session per `agentId`.
+`embedded-pi` executes a basic PI turn and keeps one in-memory PI session per `agentId`.
 
 ### Required env for real model calls
 
@@ -52,6 +52,14 @@ PI_THINKING_LEVEL=off
 
 # API key (required for PI provider call)
 OPENAI_API_KEY=your_key_here
+
+# Optional: enable CLI tool (bash) for agent runs
+PI_ENABLE_CLI_TOOL=false
+# Optional command guard; when set, commands must start with one of these
+PI_CLI_ALLOWED_PREFIXES=pwd,ls,cat,echo
+# Optional tool runtime settings
+PI_CLI_TIMEOUT_SECONDS=45
+PI_CLI_WORKDIR=/absolute/path/to/project-agent-demo
 ```
 
 Provider key mapping is exposed in `GET /api/agent/runtime`.
@@ -63,6 +71,8 @@ curl -s http://localhost:3001/api/health
 ```
 
 The server auto-loads `.env` from the project root on startup.
+
+When `PI_ENABLE_CLI_TOOL=true`, embedded PI sessions are created with a bash CLI tool.
 
 ### Agent debug logging
 
