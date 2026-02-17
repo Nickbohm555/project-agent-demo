@@ -64,6 +64,22 @@ curl -s http://localhost:3001/api/health
 
 The server auto-loads `.env` from the project root on startup.
 
+### Agent debug logging
+
+You can log agent internals during a run:
+
+```bash
+PI_LOG_EVENTS=true
+# or narrower logs:
+PI_LOG_ASSISTANT_DELTAS=true
+PI_LOG_TOOL_EVENTS=true
+# highest verbosity:
+PI_LOG_RAW_EVENTS=true
+```
+
+Note: provider-hidden reasoning/thought traces are generally not exposed by APIs.
+These logs show observable agent events, assistant deltas, and tool lifecycle events.
+
 ## Scripts
 
 - `pnpm dev`: run web + server together
