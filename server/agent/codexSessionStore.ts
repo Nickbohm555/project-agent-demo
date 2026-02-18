@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type IPty } from "@lydell/node-pty";
 
 type StreamChunkHandler = (text: string) => void;
 
@@ -17,7 +17,7 @@ type ContinueResult = {
 type CodexSessionRecord = {
   threadId: string;
   cwd: string;
-  process: ChildProcessWithoutNullStreams;
+  pty: IPty;
   queue: Promise<void>;
   lastUsedAt: string;
 };
@@ -46,25 +46,27 @@ export class CodexSessionStore {
         running: true,
         threadId,
         cwd: existing.cwd,
-        pid: existing.process.pid,
+        pid: existing.pty.pid,
       };
     }
 
-    const child = spawn("codex", ["--dangerously-bypass-approvals-and-sandbox"], {
+    const pty = spawn("codex", ["--dangerously-bypass-approvals-and-sandbox"], {
+      name: "xterm-256color",
+      cols: 140,
+      rows: 40,
       cwd,
       env: process.env,
-      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const record: CodexSessionRecord = {
       threadId,
       cwd,
-      process: child,
+      pty,
       queue: Promise.resolve(),
       lastUsedAt: nowIso(),
     };
 
-    child.on("close", () => {
+    pty.onExit(() => {
       this.sessions.delete(threadId);
     });
 
@@ -75,7 +77,7 @@ export class CodexSessionStore {
       running: true,
       threadId,
       cwd,
-      pid: child.pid,
+      pid: pty.pid,
     };
   }
 
@@ -92,7 +94,7 @@ export class CodexSessionStore {
       running: true,
       threadId,
       cwd: existing.cwd,
-      pid: existing.process.pid,
+      pid: existing.pty.pid,
       lastUsedAt: existing.lastUsedAt,
     };
   }
@@ -107,8 +109,11 @@ export class CodexSessionStore {
       };
     }
 
-    existing.process.kill("SIGTERM");
-    this.sessions.delete(threadId);
+    try {
+      existing.pty.kill();
+    } finally {
+      this.sessions.delete(threadId);
+    }
     return {
       stopped: true,
       running: false,
@@ -163,8 +168,7 @@ export class CodexSessionStore {
         idleTimer = setTimeout(finish, params.idleMs);
       };
 
-      const onData = (buffer: Buffer) => {
-        const text = buffer.toString("utf8");
+      const onData = (text: string) => {
         if (!text) {
           return;
         }
@@ -174,20 +178,19 @@ export class CodexSessionStore {
       };
 
       const onAbort = () => {
-        record.process.stdin.write("\u0003");
+        record.pty.write("\u0003");
         fail(new Error("Codex continue aborted"));
       };
 
-      const onProcessClose = () => {
+      const onExit = () => {
         fail(new Error("Codex session process exited during continue"));
       };
 
       const cleanup = () => {
         clearTimeout(hardTimeout);
         clearTimeout(idleTimer);
-        record.process.stdout.off("data", onData);
-        record.process.stderr.off("data", onData);
-        record.process.off("close", onProcessClose);
+        dataDisposable.dispose();
+        exitDisposable.dispose();
         params.signal?.removeEventListener("abort", onAbort);
       };
 
@@ -197,12 +200,11 @@ export class CodexSessionStore {
 
       let idleTimer = setTimeout(finish, params.idleMs);
 
-      record.process.stdout.on("data", onData);
-      record.process.stderr.on("data", onData);
-      record.process.on("close", onProcessClose);
+      const dataDisposable = record.pty.onData(onData);
+      const exitDisposable = record.pty.onExit(onExit);
       params.signal?.addEventListener("abort", onAbort);
 
-      record.process.stdin.write(`${prompt}\n`);
+      record.pty.write(`${prompt}\r`);
     });
   }
 }
