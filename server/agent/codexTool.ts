@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import type { AgentTool } from "@mariozechner/pi-agent-core";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import type { CodexSessionStore } from "./codexSessionStore.js";
 
 const codexToolSchema = Type.Object({
@@ -23,7 +23,7 @@ export function createCodexTool(options: {
   defaultCwd: string;
   threadId: string;
   sessionStore: CodexSessionStore;
-}): AgentTool<typeof codexToolSchema> {
+}): ToolDefinition<typeof codexToolSchema> {
   return {
     name: "codex",
     label: "Codex Session",

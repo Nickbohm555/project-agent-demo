@@ -1,4 +1,4 @@
-import { createBashTool } from "@mariozechner/pi-coding-agent";
+import { createBashTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { spawn } from "node:child_process";
 import { createCodexTool } from "./codexTool.js";
@@ -29,6 +29,11 @@ export type AgentToolConfig = {
   cliAllowedPrefixes: string[];
   codexToolEnabled: boolean;
   codexWorkdir: string;
+};
+
+export type ResolvedAgentTools = {
+  builtInTools: AgentTool<any>[];
+  customTools: Array<ToolDefinition<any, any>>;
 };
 
 export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolConfig {
@@ -110,11 +115,12 @@ function runShellCommand(command: string, cwd: string, options: {
 export function buildAgentTools(
   config: AgentToolConfig,
   context: { threadId: string },
-): AgentTool<any>[] {
-  const tools: AgentTool<any>[] = [];
+): ResolvedAgentTools {
+  const builtInTools: AgentTool<any>[] = [];
+  const customTools: Array<ToolDefinition<any, any>> = [];
 
   if (config.codexToolEnabled) {
-    tools.push(
+    customTools.push(
       createCodexTool({
         defaultCwd: config.codexWorkdir,
         threadId: context.threadId,
@@ -135,8 +141,8 @@ export function buildAgentTools(
         },
       },
     });
-    tools.push(bashTool);
+    builtInTools.push(bashTool);
   }
 
-  return tools;
+  return { builtInTools, customTools };
 }

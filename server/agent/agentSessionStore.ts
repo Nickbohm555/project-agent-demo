@@ -32,11 +32,13 @@ export class AgentSessionStore {
     }
 
     const model = getModel(this.modelConfig.provider, this.modelConfig.modelId as never);
+    const tools = buildAgentTools(this.toolConfig, { threadId: sessionId });
 
     const { session } = await createAgentSession({
       model,
       thinkingLevel: this.modelConfig.thinkingLevel,
-      tools: buildAgentTools(this.toolConfig, { threadId: sessionId }),
+      tools: tools.builtInTools,
+      customTools: tools.customTools,
       sessionManager: SessionManager.inMemory(process.cwd()),
       cwd: process.cwd(),
     });
