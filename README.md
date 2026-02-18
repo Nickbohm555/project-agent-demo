@@ -63,7 +63,6 @@ PI_CLI_WORKDIR=/absolute/path/to/project-agent-demo
 
 # Codex tool (enabled by default)
 PI_ENABLE_CODEX_TOOL=true
-PI_CODEX_WORKDIR=/Users/nickbohm/Desktop/Projects
 ```
 
 Provider key mapping is exposed in `GET /api/agent/runtime`.
@@ -78,12 +77,13 @@ The server auto-loads `.env` from the project root on startup.
 
 When `PI_ENABLE_CLI_TOOL=true`, embedded PI sessions are created with a bash CLI tool.
 Codex tool runs:
-`codex --dangerously-bypass-approvals-and-sandbox <prompt>`
-in `PI_CODEX_WORKDIR`.
+`codex --dangerously-bypass-approvals-and-sandbox`
+in `/Users/nickbohm/Desktop/Projects`.
 
 Codex terminal persistence:
-- terminal process is reused per chat thread (`sessionId`)
-- later tool calls in the same thread keep shell context (cwd/env/history)
+- one long-lived Codex process is reused per chat thread (`sessionId`)
+- tool actions:
+: `start`, `continue` (send prompt), `status`, `stop`
 
 Live streaming:
 - UI subscribes to `/api/chat/stream?sessionId=...` (SSE)

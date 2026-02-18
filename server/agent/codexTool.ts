@@ -1,69 +1,109 @@
 import { Type } from "@sinclair/typebox";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import type { PersistentTerminalStore } from "./persistentTerminal.js";
+import type { CodexSessionStore } from "./codexSessionStore.js";
 
 const codexToolSchema = Type.Object({
-  prompt: Type.String({ description: "Task for Codex CLI to execute." }),
-  cwd: Type.Optional(Type.String({ description: "Optional working directory override." })),
+  action: Type.Optional(
+    Type.Union([
+      Type.Literal("start"),
+      Type.Literal("continue"),
+      Type.Literal("stop"),
+      Type.Literal("status"),
+    ]),
+  ),
+  prompt: Type.Optional(Type.String({ description: "Prompt to send when action=continue." })),
 });
 
 type CodexToolInput = {
-  prompt: string;
-  cwd?: string;
+  action?: "start" | "continue" | "stop" | "status";
+  prompt?: string;
 };
-
-function quoteShellArg(input: string): string {
-  return `'${input.replace(/'/g, `"'"'`)}'`;
-}
 
 export function createCodexTool(options: {
   defaultCwd: string;
   threadId: string;
-  terminalStore: PersistentTerminalStore;
+  sessionStore: CodexSessionStore;
 }): AgentTool<typeof codexToolSchema> {
   return {
     name: "codex",
-    label: "Codex CLI",
+    label: "Codex Session",
     description:
-      "Run Codex CLI for codebase tasks. Uses command: codex --dangerously-bypass-approvals-and-sandbox <prompt>",
+      "Manage a long-lived Codex CLI session. Actions: start, continue, stop, status. Continue sends prompt to the existing Codex session.",
     parameters: codexToolSchema,
     execute: async (_toolCallId, params: CodexToolInput, signal, onUpdate) => {
-      const prompt = params.prompt.trim();
-      if (!prompt) {
-        throw new Error("codex tool requires a non-empty prompt");
+      const action = params.action ?? (params.prompt ? "continue" : "status");
+      const cwd = options.defaultCwd;
+
+      if (action === "start") {
+        const status = options.sessionStore.start(options.threadId, cwd);
+        const text = status.started
+          ? `Started Codex session for thread ${options.threadId} (pid=${status.pid ?? "unknown"}) in ${cwd}`
+          : `Codex session already running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`;
+        return {
+          content: [{ type: "text", text }],
+          details: {
+            action,
+            ...status,
+          },
+        };
       }
 
-      const cwd = (params.cwd?.trim() || options.defaultCwd).trim();
-      const codexCommand = `codex --dangerously-bypass-approvals-and-sandbox ${quoteShellArg(prompt)}`;
+      if (action === "status") {
+        const status = options.sessionStore.status(options.threadId);
+        const text = status.running
+          ? `Codex session is running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`
+          : `No Codex session running for thread ${options.threadId}`;
+        return {
+          content: [{ type: "text", text }],
+          details: {
+            action,
+            ...status,
+          },
+        };
+      }
 
-      const result = await options.terminalStore.execute(options.threadId, cwd, {
-        command: codexCommand,
+      if (action === "stop") {
+        const stopped = options.sessionStore.stop(options.threadId);
+        const text = stopped.stopped
+          ? `Stopped Codex session for thread ${options.threadId}`
+          : `No Codex session to stop for thread ${options.threadId}`;
+        return {
+          content: [{ type: "text", text }],
+          details: {
+            action,
+            ...stopped,
+          },
+        };
+      }
+
+      const prompt = (params.prompt ?? "").trim();
+      if (!prompt) {
+        throw new Error("codex continue action requires a non-empty prompt");
+      }
+
+      const result = await options.sessionStore.continue(options.threadId, cwd, {
+        prompt,
         timeoutMs: 10 * 60 * 1000,
+        idleMs: 1_200,
         signal,
         onChunk: (text) => {
           onUpdate?.({
             content: [{ type: "text", text }],
             details: {
               status: "stream",
-              command: codexCommand,
-              cwd,
+              action,
               threadId: options.threadId,
             },
           });
         },
       });
 
-      const finalText = result.output || "Codex command completed with no output.";
-      const status = result.exitCode === 0 ? "completed" : "failed";
-
       return {
-        content: [{ type: "text", text: finalText }],
+        content: [{ type: "text", text: result.output || "Codex prompt completed with no output." }],
         details: {
-          status,
-          exitCode: result.exitCode,
-          command: codexCommand,
-          cwd,
+          action,
           threadId: options.threadId,
+          cwd,
         },
       };
     },

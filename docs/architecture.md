@@ -13,8 +13,10 @@ React Chat UI
       -> ChatService appends user message
         -> AgentRuntime.run(...)
           -> MockAgentRuntime OR EmbeddedPiRuntime
-            -> AgentSessionStore.getOrCreate(agentId)
-              -> one PI AgentSession per agent
+            -> AgentSessionStore.getOrCreate(agentId, sessionId)
+              -> one PI AgentSession per agent/thread
+            -> codexTool action=continue
+              -> CodexSessionStore (long-lived process per thread)
         -> ChatService appends assistant message
   <- returns session + run status
 
@@ -47,10 +49,10 @@ React Chat UI
 4. Runtime layer (`server/agent/*`)
 - `MockAgentRuntime`: deterministic local behavior
 - `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with optional CLI `bash` tool
-- `AgentSessionStore`: keeps one in-memory PI session per `agentId`
+- `AgentSessionStore`: keeps one in-memory PI session per `agentId+sessionId`
 - `modelConfig`: resolves provider/model/thinking + required API key env readiness
 - `toolConfig`: toggles CLI `bash` tool and optional command prefix allowlist
-- `codexTool`: runs `codex --dangerously-bypass-approvals-and-sandbox <prompt>`
+- `codexTool`: controls long-lived Codex sessions (`start`, `continue`, `status`, `stop`)
 
 ## OpenClaw concept mapping
 

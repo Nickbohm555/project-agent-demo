@@ -24,7 +24,6 @@ describe("resolveAgentToolConfig", () => {
     vi.stubEnv("PI_CLI_TIMEOUT_SECONDS", "30");
     vi.stubEnv("PI_CLI_ALLOWED_PREFIXES", "pwd, ls, npm run");
     vi.stubEnv("PI_ENABLE_CODEX_TOOL", "false");
-    vi.stubEnv("PI_CODEX_WORKDIR", "/tmp/codex");
 
     const cfg = resolveAgentToolConfig("/tmp/demo");
 
@@ -33,7 +32,7 @@ describe("resolveAgentToolConfig", () => {
     expect(cfg.cliTimeoutSeconds).toBe(30);
     expect(cfg.cliAllowedPrefixes).toEqual(["pwd", "ls", "npm run"]);
     expect(cfg.codexToolEnabled).toBe(false);
-    expect(cfg.codexWorkdir).toBe("/tmp/codex");
+    expect(cfg.codexWorkdir).toBe("/Users/nickbohm/Desktop/Projects");
 
     vi.unstubAllEnvs();
   });
