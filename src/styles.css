@@ -69,6 +69,22 @@ body {
   border: 1px solid #d8d2c8;
 }
 
+.live-panel {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px dashed #9d9388;
+  padding: 0.65rem 0.75rem;
+  background: #faf6ef;
+}
+
+.live-panel p,
+.live-panel pre {
+  margin: 0.3rem 0 0;
+  white-space: pre-wrap;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
 .bubble p {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;

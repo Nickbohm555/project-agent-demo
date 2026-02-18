@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { ChatEventBus } from "./chatEvents.js";
 import type { ChatService } from "./chatService.js";
 
 const sendRequestSchema = z.object({
@@ -8,8 +9,39 @@ const sendRequestSchema = z.object({
   message: z.string().min(1),
 });
 
-export function buildChatRouter(chatService: ChatService): Router {
+export function buildChatRouter(chatService: ChatService, events: ChatEventBus): Router {
   const router = Router();
+
+  router.get("/stream", (req, res) => {
+    const sessionId = String(req.query.sessionId ?? "").trim();
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendEvent = (payload: unknown) => {
+      res.write(`data: ${JSON.stringify(payload)}\\n\\n`);
+    };
+
+    const unsubscribe = events.subscribe(sessionId, (event) => {
+      sendEvent(event);
+    });
+
+    const keepAlive = setInterval(() => {
+      res.write(":keepalive\\n\\n");
+    }, 20_000);
+
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+      res.end();
+    });
+  });
 
   router.get("/history", (req, res) => {
     const sessionId = String(req.query.sessionId ?? "demo-session");

@@ -1,6 +1,7 @@
 import { createBashTool } from "@mariozechner/pi-coding-agent";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { spawn } from "node:child_process";
+import { createCodexTool } from "./codexTool.js";
 
 function envFlag(name: string): boolean {
   const value = process.env[name]?.trim().toLowerCase();
@@ -22,12 +23,20 @@ export type AgentToolConfig = {
   cliWorkdir: string;
   cliTimeoutSeconds: number;
   cliAllowedPrefixes: string[];
+  codexToolEnabled: boolean;
+  codexWorkdir: string;
 };
 
 export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolConfig {
   const cliToolEnabled = envFlag("PI_ENABLE_CLI_TOOL");
   const cliWorkdir = process.env.PI_CLI_WORKDIR?.trim() || cwd;
   const cliTimeoutSeconds = Math.max(1, Number(process.env.PI_CLI_TIMEOUT_SECONDS ?? 45));
+  const rawCodexEnabled = process.env.PI_ENABLE_CODEX_TOOL;
+  const codexToolEnabled = rawCodexEnabled == null || rawCodexEnabled.trim() === ""
+    ? true
+    : envFlag("PI_ENABLE_CODEX_TOOL");
+  const codexWorkdir =
+    process.env.PI_CODEX_WORKDIR?.trim() || "/Users/nickbohm/Desktop/Projects";
 
   // Empty means no prefix policy (all commands allowed).
   const cliAllowedPrefixes = parseCsv(process.env.PI_CLI_ALLOWED_PREFIXES);
@@ -37,6 +46,8 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
     cliWorkdir,
     cliTimeoutSeconds,
     cliAllowedPrefixes,
+    codexToolEnabled,
+    codexWorkdir,
   };
 }
 
@@ -96,21 +107,26 @@ function runShellCommand(command: string, cwd: string, options: {
 }
 
 export function buildAgentTools(config: AgentToolConfig): AgentTool<any>[] {
-  if (!config.cliToolEnabled) {
-    return [];
+  const tools: AgentTool<any>[] = [];
+
+  if (config.codexToolEnabled) {
+    tools.push(createCodexTool(config.codexWorkdir));
   }
 
-  const bashTool = createBashTool(config.cliWorkdir, {
-    operations: {
-      exec: async (command, cwd, options) => {
-        assertCommandAllowed(command, config.cliAllowedPrefixes);
-        return runShellCommand(command, cwd, {
-          ...options,
-          timeout: options.timeout ?? config.cliTimeoutSeconds,
-        });
+  if (config.cliToolEnabled) {
+    const bashTool = createBashTool(config.cliWorkdir, {
+      operations: {
+        exec: async (command, cwd, options) => {
+          assertCommandAllowed(command, config.cliAllowedPrefixes);
+          return runShellCommand(command, cwd, {
+            ...options,
+            timeout: options.timeout ?? config.cliTimeoutSeconds,
+          });
+        },
       },
-    },
-  });
+    });
+    tools.push(bashTool);
+  }
 
-  return [bashTool];
+  return tools;
 }

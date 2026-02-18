@@ -60,6 +60,10 @@ PI_CLI_ALLOWED_PREFIXES=pwd,ls,cat,echo
 # Optional tool runtime settings
 PI_CLI_TIMEOUT_SECONDS=45
 PI_CLI_WORKDIR=/absolute/path/to/project-agent-demo
+
+# Codex tool (enabled by default)
+PI_ENABLE_CODEX_TOOL=true
+PI_CODEX_WORKDIR=/Users/nickbohm/Desktop/Projects
 ```
 
 Provider key mapping is exposed in `GET /api/agent/runtime`.
@@ -73,6 +77,13 @@ curl -s http://localhost:3001/api/health
 The server auto-loads `.env` from the project root on startup.
 
 When `PI_ENABLE_CLI_TOOL=true`, embedded PI sessions are created with a bash CLI tool.
+Codex tool runs:
+`codex --dangerously-bypass-approvals-and-sandbox <prompt>`
+in `PI_CODEX_WORKDIR`.
+
+Live streaming:
+- UI subscribes to `/api/chat/stream?sessionId=...` (SSE)
+- tool stdout/stderr and assistant deltas stream into the chat UI in real time
 
 ### Agent debug logging
 

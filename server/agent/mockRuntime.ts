@@ -11,7 +11,7 @@ export class MockAgentRuntime implements AgentRuntime {
       .join(" | ");
 
     return {
-      runId: randomUUID(),
+      runId: input.runId || randomUUID(),
       status: "completed",
       assistantText: [
         "This is a mock runtime response.",

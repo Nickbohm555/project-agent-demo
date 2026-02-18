@@ -19,6 +19,10 @@ React Chat UI
   <- returns session + run status
 
 React Chat UI
+  -> GET /api/chat/stream?sessionId=...
+  <- SSE events (lifecycle, assistant deltas, tool output)
+
+React Chat UI
   -> GET /api/chat/history
   <- returns session transcript
 ```
@@ -46,6 +50,7 @@ React Chat UI
 - `AgentSessionStore`: keeps one in-memory PI session per `agentId`
 - `modelConfig`: resolves provider/model/thinking + required API key env readiness
 - `toolConfig`: toggles CLI `bash` tool and optional command prefix allowlist
+- `codexTool`: runs `codex --dangerously-bypass-approvals-and-sandbox <prompt>`
 
 ## OpenClaw concept mapping
 

@@ -47,6 +47,19 @@ function eventSnippet(event: AgentSessionEvent): string | undefined {
   return undefined;
 }
 
+function getToolOutputText(event: AgentSessionEvent): string | undefined {
+  if (event.type !== "tool_execution_update") {
+    return undefined;
+  }
+  const partialResult = event.partialResult as { content?: Array<{ type?: string; text?: string }> };
+  const chunks = Array.isArray(partialResult?.content) ? partialResult.content : [];
+  const text = chunks
+    .map((chunk) => (chunk?.type === "text" && typeof chunk.text === "string" ? chunk.text : ""))
+    .filter(Boolean)
+    .join("");
+  return text || undefined;
+}
+
 export class EmbeddedPiRuntime implements AgentRuntime {
   name = "embedded-pi";
 
@@ -103,6 +116,30 @@ export class EmbeddedPiRuntime implements AgentRuntime {
             `[embedded-pi] tool agent=${input.agentId} session=${record.session.sessionId} type=${event.type} name=${toolName}`,
           );
         }
+
+        if (
+          (event.type === "message_update" || event.type === "message_end") &&
+          event.message.role === "assistant"
+        ) {
+          const text = extractText(event.message);
+          if (text) {
+            input.emit?.({
+              type: "assistant_delta",
+              text,
+            });
+          }
+        }
+
+        if (event.type === "tool_execution_update") {
+          const outputText = getToolOutputText(event);
+          if (outputText) {
+            input.emit?.({
+              type: "tool_output",
+              toolName: event.toolName,
+              text: outputText,
+            });
+          }
+        }
       });
 
       try {
@@ -118,7 +155,7 @@ export class EmbeddedPiRuntime implements AgentRuntime {
       const assistantText = extractText(lastAssistant) || "Agent completed with no assistant text.";
 
       return {
-        runId: randomUUID(),
+        runId: input.runId || randomUUID(),
         status: "completed",
         assistantText,
         diagnostics: {
@@ -131,7 +168,7 @@ export class EmbeddedPiRuntime implements AgentRuntime {
       };
     } catch (err) {
       return {
-        runId: randomUUID(),
+        runId: input.runId || randomUUID(),
         status: "failed",
         assistantText: "Embedded PI runtime failed.",
         diagnostics: {

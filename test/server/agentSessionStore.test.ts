@@ -15,6 +15,8 @@ const toolConfig = {
   cliWorkdir: process.cwd(),
   cliTimeoutSeconds: 45,
   cliAllowedPrefixes: [],
+  codexToolEnabled: false,
+  codexWorkdir: process.cwd(),
 } as const;
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({

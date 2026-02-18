@@ -1,8 +1,12 @@
+import type { ChatStreamEvent } from "../chat/chatEvents.js";
+
 export type AgentRuntimeRequest = {
+  runId: string;
   agentId: string;
   sessionId: string;
   message: string;
   conversation: Array<{ role: "user" | "assistant" | "system"; text: string }>;
+  emit?: (event: Omit<ChatStreamEvent, "sessionId" | "runId" | "timestamp">) => void;
 };
 
 export type AgentRuntimeResponse = {

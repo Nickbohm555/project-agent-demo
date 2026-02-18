@@ -25,3 +25,13 @@ export type SendChatResponse = {
     status: "accepted" | "completed" | "failed";
   };
 };
+
+export type ChatStreamEvent = {
+  sessionId: string;
+  runId: string;
+  type: "lifecycle" | "assistant_delta" | "tool_output";
+  phase?: "start" | "end" | "error";
+  text?: string;
+  toolName?: string;
+  timestamp: string;
+};

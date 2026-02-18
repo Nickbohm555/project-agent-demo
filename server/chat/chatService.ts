@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { AgentRuntime } from "../agent/types.js";
+import type { AgentRuntime, AgentRuntimeResponse } from "../agent/types.js";
+import type { ChatEventBus } from "./chatEvents.js";
 import type { ChatMessage, ChatSession } from "./chatTypes.js";
 
 export class ChatService {
   private sessions = new Map<string, ChatSession>();
 
-  constructor(private runtime: AgentRuntime) {}
+  constructor(
+    private runtime: AgentRuntime,
+    private events: ChatEventBus,
+  ) {}
 
   getSession(sessionId: string): ChatSession {
     const existing = this.sessions.get(sessionId);
@@ -31,6 +35,7 @@ export class ChatService {
   async sendMessage(agentId: string, sessionId: string, message: string) {
     const session = this.getSession(sessionId);
     const now = new Date().toISOString();
+    const runId = randomUUID();
 
     const userMessage: ChatMessage = {
       id: randomUUID(),
@@ -40,12 +45,42 @@ export class ChatService {
     };
     session.messages.push(userMessage);
 
-    const run = await this.runtime.run({
-      agentId,
+    this.events.publish({
       sessionId,
-      message,
-      conversation: session.messages.map((item) => ({ role: item.role, text: item.text })),
+      runId,
+      type: "lifecycle",
+      phase: "start",
+      timestamp: new Date().toISOString(),
     });
+
+    let run: AgentRuntimeResponse;
+    try {
+      run = await this.runtime.run({
+        runId,
+        agentId,
+        sessionId,
+        message,
+        conversation: session.messages.map((item) => ({ role: item.role, text: item.text })),
+        emit: (event) => {
+          this.events.publish({
+            sessionId,
+            runId,
+            timestamp: new Date().toISOString(),
+            ...event,
+          });
+        },
+      });
+    } catch (err) {
+      this.events.publish({
+        sessionId,
+        runId,
+        type: "lifecycle",
+        phase: "error",
+        text: String(err),
+        timestamp: new Date().toISOString(),
+      });
+      throw err;
+    }
 
     const assistantMessage: ChatMessage = {
       id: randomUUID(),
@@ -59,10 +94,18 @@ export class ChatService {
 
     session.messages.push(assistantMessage);
 
+    this.events.publish({
+      sessionId,
+      runId,
+      type: "lifecycle",
+      phase: run.status === "completed" ? "end" : "error",
+      timestamp: new Date().toISOString(),
+    });
+
     return {
       session,
       run: {
-        id: run.runId,
+        id: runId,
         status: run.status,
       },
     };

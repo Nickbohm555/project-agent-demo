@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { fetchHistory, sendMessage } from "../lib/api";
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage, ChatStreamEvent } from "../types/chat";
 
 type ChatWindowProps = {
   agentId: string;
@@ -13,6 +13,8 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveAssistant, setLiveAssistant] = useState("");
+  const [liveTool, setLiveTool] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +40,33 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
     return () => {
       cancelled = true;
     };
+  }, [sessionId]);
+
+  useEffect(() => {
+    const eventSource = new EventSource(`/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}`);
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as ChatStreamEvent;
+        if (payload.type === "lifecycle" && payload.phase === "start") {
+          setLiveAssistant("");
+          setLiveTool("");
+          return;
+        }
+        if (payload.type === "assistant_delta" && payload.text) {
+          setLiveAssistant(payload.text);
+          return;
+        }
+        if (payload.type === "tool_output" && payload.text) {
+          setLiveTool((current) => `${current}${payload.text}`.slice(-12_000));
+        }
+      } catch {
+        // ignore malformed SSE payload
+      }
+    };
+    eventSource.onerror = () => {
+      // browser auto-reconnects for EventSource
+    };
+    return () => eventSource.close();
   }, [sessionId]);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
@@ -86,6 +115,20 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
       <section className="chat-log" aria-live="polite">
         {loading ? <p className="status">Loading chat...</p> : null}
         {!loading && messages.length === 0 ? <p className="status">No messages yet.</p> : null}
+
+        {liveTool ? (
+          <article className="live-panel">
+            <span className="role">tool stream</span>
+            <pre>{liveTool}</pre>
+          </article>
+        ) : null}
+
+        {liveAssistant ? (
+          <article className="live-panel">
+            <span className="role">assistant stream</span>
+            <p>{liveAssistant}</p>
+          </article>
+        ) : null}
 
         {messages.map((message) => (
           <article key={message.id} className={`bubble bubble-${message.role}`}>

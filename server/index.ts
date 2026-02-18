@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { loadEnvironmentFromDotenv } from "./config/load-env.js";
 import { buildRuntimeContext } from "./agent/runtimeFactory.js";
+import { ChatEventBus } from "./chat/chatEvents.js";
 import { ChatService } from "./chat/chatService.js";
 import { buildChatRouter } from "./chat/chatRouter.js";
 
@@ -13,7 +14,8 @@ app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 const { runtime, sessionStore, modelConfig, toolConfig } = buildRuntimeContext();
-const chatService = new ChatService(runtime);
+const eventBus = new ChatEventBus();
+const chatService = new ChatService(runtime, eventBus);
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -23,6 +25,7 @@ app.get("/api/health", (_req, res) => {
     thinkingLevel: modelConfig.thinkingLevel,
     hasRequiredApiKey: modelConfig.hasRequiredApiKey,
     cliToolEnabled: toolConfig.cliToolEnabled,
+    codexToolEnabled: toolConfig.codexToolEnabled,
   });
 });
 
@@ -38,7 +41,7 @@ app.get("/api/agent/runtime", (_req, res) => {
   });
 });
 
-app.use("/api/chat", buildChatRouter(chatService));
+app.use("/api/chat", buildChatRouter(chatService, eventBus));
 
 app.listen(port, () => {
   console.log(
