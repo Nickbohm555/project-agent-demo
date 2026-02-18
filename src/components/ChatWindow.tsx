@@ -18,24 +18,34 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let attempt = 0;
     setLoading(true);
     setError(null);
-    fetchHistory(sessionId)
-      .then((session) => {
-        if (!cancelled) {
-          setMessages(session.messages);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
+
+    const load = () => {
+      fetchHistory(sessionId)
+        .then((session) => {
+          if (!cancelled) {
+            setMessages(session.messages);
+            setLoading(false);
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          if (cancelled) {
+            return;
+          }
+          attempt += 1;
+          if (attempt < 10) {
+            window.setTimeout(load, 700);
+            return;
+          }
           setError(String(err));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
           setLoading(false);
-        }
-      });
+        });
+    };
+
+    load();
 
     return () => {
       cancelled = true;
