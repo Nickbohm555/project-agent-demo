@@ -49,8 +49,8 @@ describe("AgentSessionStore", () => {
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
     const store = new AgentSessionStore(modelConfig, toolConfig);
 
-    const first = await store.getOrCreate("agent-a");
-    const second = await store.getOrCreate("agent-a");
+    const first = await store.getOrCreate("agent-a", "thread-1");
+    const second = await store.getOrCreate("agent-a", "thread-1");
 
     expect(first.session).toBe(second.session);
     expect(createAgentSessionMock).toHaveBeenCalledTimes(1);
@@ -78,8 +78,8 @@ describe("AgentSessionStore", () => {
     const { AgentSessionStore } = await import("../../server/agent/agentSessionStore.js");
     const store = new AgentSessionStore(modelConfig, toolConfig);
 
-    const a = await store.getOrCreate("agent-a");
-    const b = await store.getOrCreate("agent-b");
+    const a = await store.getOrCreate("agent-a", "thread-1");
+    const b = await store.getOrCreate("agent-b", "thread-2");
 
     expect(a.session).not.toBe(b.session);
     expect(createAgentSessionMock).toHaveBeenCalledTimes(2);
@@ -87,5 +87,6 @@ describe("AgentSessionStore", () => {
     const snapshots = store.list();
     expect(snapshots).toHaveLength(2);
     expect(snapshots.map((item) => item.agentId).sort()).toEqual(["agent-a", "agent-b"]);
+    expect(snapshots.map((item) => item.sessionId).sort()).toEqual(["thread-1", "thread-2"]);
   });
 });

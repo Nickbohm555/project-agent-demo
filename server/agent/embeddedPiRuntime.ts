@@ -67,7 +67,7 @@ export class EmbeddedPiRuntime implements AgentRuntime {
 
   async run(input: AgentRuntimeRequest): Promise<AgentRuntimeResponse> {
     try {
-      const record = await this.sessionStore.getOrCreate(input.agentId);
+      const record = await this.sessionStore.getOrCreate(input.agentId, input.sessionId);
       const beforeCount = record.session.state.messages.length;
       const logAllEvents = envFlag("PI_LOG_EVENTS");
       const logAssistant = envFlag("PI_LOG_ASSISTANT_DELTAS");

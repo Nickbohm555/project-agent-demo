@@ -2,6 +2,9 @@ import { createBashTool } from "@mariozechner/pi-coding-agent";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { spawn } from "node:child_process";
 import { createCodexTool } from "./codexTool.js";
+import { PersistentTerminalStore } from "./persistentTerminal.js";
+
+const terminalStore = new PersistentTerminalStore();
 
 function envFlag(name: string): boolean {
   const value = process.env[name]?.trim().toLowerCase();
@@ -38,7 +41,6 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
   const codexWorkdir =
     process.env.PI_CODEX_WORKDIR?.trim() || "/Users/nickbohm/Desktop/Projects";
 
-  // Empty means no prefix policy (all commands allowed).
   const cliAllowedPrefixes = parseCsv(process.env.PI_CLI_ALLOWED_PREFIXES);
 
   return {
@@ -106,11 +108,20 @@ function runShellCommand(command: string, cwd: string, options: {
   });
 }
 
-export function buildAgentTools(config: AgentToolConfig): AgentTool<any>[] {
+export function buildAgentTools(
+  config: AgentToolConfig,
+  context: { threadId: string },
+): AgentTool<any>[] {
   const tools: AgentTool<any>[] = [];
 
   if (config.codexToolEnabled) {
-    tools.push(createCodexTool(config.codexWorkdir));
+    tools.push(
+      createCodexTool({
+        defaultCwd: config.codexWorkdir,
+        threadId: context.threadId,
+        terminalStore,
+      }),
+    );
   }
 
   if (config.cliToolEnabled) {

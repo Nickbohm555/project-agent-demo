@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { spawn } from "node:child_process";
+import type { PersistentTerminalStore } from "./persistentTerminal.js";
 
 const codexToolSchema = Type.Object({
   prompt: Type.String({ description: "Task for Codex CLI to execute." }),
@@ -13,10 +13,14 @@ type CodexToolInput = {
 };
 
 function quoteShellArg(input: string): string {
-  return `'${input.replace(/'/g, `'"'"'`)}'`;
+  return `'${input.replace(/'/g, `"'"'`)}'`;
 }
 
-export function createCodexTool(defaultCwd: string): AgentTool<typeof codexToolSchema> {
+export function createCodexTool(options: {
+  defaultCwd: string;
+  threadId: string;
+  terminalStore: PersistentTerminalStore;
+}): AgentTool<typeof codexToolSchema> {
   return {
     name: "codex",
     label: "Codex CLI",
@@ -29,63 +33,37 @@ export function createCodexTool(defaultCwd: string): AgentTool<typeof codexToolS
         throw new Error("codex tool requires a non-empty prompt");
       }
 
-      const cwd = (params.cwd?.trim() || defaultCwd).trim();
+      const cwd = (params.cwd?.trim() || options.defaultCwd).trim();
       const codexCommand = `codex --dangerously-bypass-approvals-and-sandbox ${quoteShellArg(prompt)}`;
-      const shell = process.env.SHELL || "bash";
 
-      const chunks: string[] = [];
-
-      const exitCode = await new Promise<number | null>((resolve, reject) => {
-        const child = spawn(shell, ["-lc", codexCommand], {
-          cwd,
-          env: process.env,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-
-        const onAbort = () => child.kill("SIGTERM");
-        signal?.addEventListener("abort", onAbort);
-
-        const onChunk = (buffer: Buffer) => {
-          const text = buffer.toString("utf8");
-          if (!text) {
-            return;
-          }
-          chunks.push(text);
+      const result = await options.terminalStore.execute(options.threadId, cwd, {
+        command: codexCommand,
+        timeoutMs: 10 * 60 * 1000,
+        signal,
+        onChunk: (text) => {
           onUpdate?.({
             content: [{ type: "text", text }],
             details: {
               status: "stream",
               command: codexCommand,
               cwd,
+              threadId: options.threadId,
             },
           });
-        };
-
-        child.stdout.on("data", onChunk);
-        child.stderr.on("data", onChunk);
-
-        child.on("error", (err) => {
-          signal?.removeEventListener("abort", onAbort);
-          reject(err);
-        });
-
-        child.on("close", (code) => {
-          signal?.removeEventListener("abort", onAbort);
-          resolve(code);
-        });
+        },
       });
 
-      const output = chunks.join("").trim();
-      const finalText = output || "Codex command completed with no output.";
-      const status = exitCode === 0 ? "completed" : "failed";
+      const finalText = result.output || "Codex command completed with no output.";
+      const status = result.exitCode === 0 ? "completed" : "failed";
 
       return {
         content: [{ type: "text", text: finalText }],
         details: {
           status,
-          exitCode,
+          exitCode: result.exitCode,
           command: codexCommand,
           cwd,
+          threadId: options.threadId,
         },
       };
     },

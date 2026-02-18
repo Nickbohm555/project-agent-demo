@@ -5,10 +5,15 @@ import { buildAgentTools, type AgentToolConfig } from "./toolConfig.js";
 
 type SessionRecord = {
   agentId: string;
+  sessionId: string;
   session: AgentSession;
   createdAt: string;
   lastUsedAt: string;
 };
+
+function sessionKey(agentId: string, sessionId: string) {
+  return `${agentId}::${sessionId}`;
+}
 
 export class AgentSessionStore {
   private records = new Map<string, SessionRecord>();
@@ -18,8 +23,9 @@ export class AgentSessionStore {
     private toolConfig: AgentToolConfig,
   ) {}
 
-  async getOrCreate(agentId: string): Promise<SessionRecord> {
-    const existing = this.records.get(agentId);
+  async getOrCreate(agentId: string, sessionId: string): Promise<SessionRecord> {
+    const key = sessionKey(agentId, sessionId);
+    const existing = this.records.get(key);
     if (existing) {
       existing.lastUsedAt = new Date().toISOString();
       return existing;
@@ -30,7 +36,7 @@ export class AgentSessionStore {
     const { session } = await createAgentSession({
       model,
       thinkingLevel: this.modelConfig.thinkingLevel,
-      tools: buildAgentTools(this.toolConfig),
+      tools: buildAgentTools(this.toolConfig, { threadId: sessionId }),
       sessionManager: SessionManager.inMemory(process.cwd()),
       cwd: process.cwd(),
     });
@@ -38,18 +44,20 @@ export class AgentSessionStore {
     const now = new Date().toISOString();
     const created: SessionRecord = {
       agentId,
+      sessionId,
       session,
       createdAt: now,
       lastUsedAt: now,
     };
 
-    this.records.set(agentId, created);
+    this.records.set(key, created);
     return created;
   }
 
   list() {
     return Array.from(this.records.values()).map((record) => ({
       agentId: record.agentId,
+      sessionId: record.sessionId,
       createdAt: record.createdAt,
       lastUsedAt: record.lastUsedAt,
       piSessionId: record.session.sessionId,

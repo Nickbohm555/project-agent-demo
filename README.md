@@ -81,6 +81,10 @@ Codex tool runs:
 `codex --dangerously-bypass-approvals-and-sandbox <prompt>`
 in `PI_CODEX_WORKDIR`.
 
+Codex terminal persistence:
+- terminal process is reused per chat thread (`sessionId`)
+- later tool calls in the same thread keep shell context (cwd/env/history)
+
 Live streaming:
 - UI subscribes to `/api/chat/stream?sessionId=...` (SSE)
 - tool stdout/stderr and assistant deltas stream into the chat UI in real time
