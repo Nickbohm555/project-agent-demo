@@ -80,41 +80,36 @@ export class EmbeddedPiRuntime implements AgentRuntime {
             `[embedded-pi] raw-event agent=${input.agentId} session=${record.session.sessionId} type=${event.type}`,
             event,
           );
-          return;
-        }
-
-        if (logAllEvents) {
+        } else if (logAllEvents) {
           const snippet = eventSnippet(event);
           console.log(
             `[embedded-pi] event agent=${input.agentId} session=${record.session.sessionId} type=${event.type}${snippet ? ` text="${snippet}"` : ""}`,
           );
-          return;
-        }
+        } else {
+          if (
+            logAssistant &&
+            (event.type === "message_update" || event.type === "message_end") &&
+            event.message.role === "assistant"
+          ) {
+            const snippet = eventSnippet(event);
+            if (snippet) {
+              console.log(
+                `[embedded-pi] assistant agent=${input.agentId} session=${record.session.sessionId} type=${event.type} text="${snippet}"`,
+              );
+            }
+          }
 
-        if (
-          logAssistant &&
-          (event.type === "message_update" || event.type === "message_end") &&
-          event.message.role === "assistant"
-        ) {
-          const snippet = eventSnippet(event);
-          if (snippet) {
+          if (
+            logTools &&
+            (event.type === "tool_execution_start" ||
+              event.type === "tool_execution_update" ||
+              event.type === "tool_execution_end")
+          ) {
+            const toolName = "toolName" in event ? event.toolName : "unknown";
             console.log(
-              `[embedded-pi] assistant agent=${input.agentId} session=${record.session.sessionId} type=${event.type} text="${snippet}"`,
+              `[embedded-pi] tool agent=${input.agentId} session=${record.session.sessionId} type=${event.type} name=${toolName}`,
             );
           }
-          return;
-        }
-
-        if (
-          logTools &&
-          (event.type === "tool_execution_start" ||
-            event.type === "tool_execution_update" ||
-            event.type === "tool_execution_end")
-        ) {
-          const toolName = "toolName" in event ? event.toolName : "unknown";
-          console.log(
-            `[embedded-pi] tool agent=${input.agentId} session=${record.session.sessionId} type=${event.type} name=${toolName}`,
-          );
         }
 
         if (

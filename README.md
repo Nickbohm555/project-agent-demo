@@ -20,8 +20,23 @@ pnpm install
 pnpm dev
 ```
 
-- Web app: `http://localhost:5173`
-- API server: `http://localhost:3001`
+- Web app: `http://localhost:43218`
+- API server: `http://localhost:43217`
+
+## Quick start (Docker)
+
+```bash
+docker compose up --build
+```
+
+- Web app: `http://localhost:43218`
+- API server: `http://localhost:43217`
+
+Notes:
+- `docker compose` loads variables from `.env` via `env_file`.
+- Container defaults `PI_ENABLE_CODEX_TOOL=false` so the app can run even when `codex` is not installed in the image.
+- Vite host binding is controlled by `PAD_WEB_HOST` (defaults to `0.0.0.0` in `docker-compose.yml`).
+- Container defaults `PI_LOG_TOOL_EVENTS=true` so tool lifecycle usage is visible in `docker compose logs -f app`.
 
 ## Runtime mode and model config
 
@@ -69,8 +84,8 @@ Provider key mapping is exposed in `GET /api/agent/runtime`.
 Readiness quick check:
 
 ```bash
-curl -s http://localhost:3001/api/agent/runtime
-curl -s http://localhost:3001/api/health
+curl -s http://localhost:43217/api/agent/runtime
+curl -s http://localhost:43217/api/health
 ```
 
 The server auto-loads `.env` from the project root on startup.
@@ -104,6 +119,17 @@ PI_LOG_RAW_EVENTS=true
 
 Note: provider-hidden reasoning/thought traces are generally not exposed by APIs.
 These logs show observable agent events, assistant deltas, and tool lifecycle events.
+
+Runtime startup logs now include:
+- configured tool list (`codex`, `bash`)
+- tool workdirs
+- active logging flags
+
+For container log tailing:
+
+```bash
+docker compose logs -f app
+```
 
 ## Scripts
 

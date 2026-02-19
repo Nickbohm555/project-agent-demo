@@ -4,7 +4,6 @@ import { spawn } from "node:child_process";
 import { createCodexTool } from "./codexTool.js";
 import { CodexSessionStore } from "./codexSessionStore.js";
 
-const CODEX_WORKDIR = "/Users/nickbohm/Desktop/Projects";
 const codexSessionStore = new CodexSessionStore();
 
 function envFlag(name: string): boolean {
@@ -36,9 +35,21 @@ export type ResolvedAgentTools = {
   customTools: Array<ToolDefinition<any, any>>;
 };
 
+export function getConfiguredToolNames(config: AgentToolConfig): string[] {
+  const names: string[] = [];
+  if (config.codexToolEnabled) {
+    names.push("codex");
+  }
+  if (config.cliToolEnabled) {
+    names.push("bash");
+  }
+  return names;
+}
+
 export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolConfig {
   const cliToolEnabled = envFlag("PI_ENABLE_CLI_TOOL");
   const cliWorkdir = process.env.PI_CLI_WORKDIR?.trim() || cwd;
+  const codexWorkdir = process.env.PI_CODEX_WORKDIR?.trim() || cwd;
   const cliTimeoutSeconds = Math.max(1, Number(process.env.PI_CLI_TIMEOUT_SECONDS ?? 45));
   const rawCodexEnabled = process.env.PI_ENABLE_CODEX_TOOL;
   const codexToolEnabled = rawCodexEnabled == null || rawCodexEnabled.trim() === ""
@@ -53,7 +64,7 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
     cliTimeoutSeconds,
     cliAllowedPrefixes,
     codexToolEnabled,
-    codexWorkdir: CODEX_WORKDIR,
+    codexWorkdir,
   };
 }
 

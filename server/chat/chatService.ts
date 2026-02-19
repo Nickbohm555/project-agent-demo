@@ -36,6 +36,7 @@ export class ChatService {
     const session = this.getSession(sessionId);
     const now = new Date().toISOString();
     const runId = randomUUID();
+    const startedAtMs = Date.now();
 
     const userMessage: ChatMessage = {
       id: randomUUID(),
@@ -52,6 +53,9 @@ export class ChatService {
       phase: "start",
       timestamp: new Date().toISOString(),
     });
+    console.log(
+      `[chat] run started runId=${runId} agentId=${agentId} sessionId=${sessionId} runtime=${this.runtime.name} inputChars=${message.length}`,
+    );
 
     let run: AgentRuntimeResponse;
     try {
@@ -71,15 +75,25 @@ export class ChatService {
         },
       });
     } catch (err) {
+      const errorText = String(err);
       this.events.publish({
         sessionId,
         runId,
         type: "lifecycle",
         phase: "error",
-        text: String(err),
+        text: errorText,
         timestamp: new Date().toISOString(),
       });
-      throw err;
+      run = {
+        runId,
+        status: "failed",
+        assistantText: "Agent run failed.",
+        diagnostics: {
+          adapter: this.runtime.name,
+          agentId,
+          error: errorText,
+        },
+      };
     }
 
     const assistantMessage: ChatMessage = {
@@ -101,6 +115,10 @@ export class ChatService {
       phase: run.status === "completed" ? "end" : "error",
       timestamp: new Date().toISOString(),
     });
+    const elapsedMs = Date.now() - startedAtMs;
+    console.log(
+      `[chat] run finished runId=${runId} agentId=${agentId} sessionId=${sessionId} status=${run.status} elapsedMs=${elapsedMs}`,
+    );
 
     return {
       session,
