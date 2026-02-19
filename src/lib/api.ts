@@ -1,4 +1,11 @@
-import type { AgentRuntimeInfo, ChatSession, SendChatRequest, SendChatResponse } from "../types/chat";
+import type {
+  AgentRuntimeInfo,
+  ChatSession,
+  CodexExecuteRequest,
+  CodexExecuteResponse,
+  SendChatRequest,
+  SendChatResponse,
+} from "../types/chat";
 
 async function getErrorMessage(res: Response, fallback: string): Promise<string> {
   const body = await res.text();
@@ -51,4 +58,20 @@ export async function fetchRuntimeInfo(): Promise<AgentRuntimeInfo> {
     throw new Error(await getErrorMessage(res, `Failed to load runtime info (${res.status})`));
   }
   return (await res.json()) as AgentRuntimeInfo;
+}
+
+export async function executeCodexAction(payload: CodexExecuteRequest): Promise<CodexExecuteResponse> {
+  const res = await fetch("/api/codex/execute", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, `Failed to execute codex action (${res.status})`));
+  }
+
+  return (await res.json()) as CodexExecuteResponse;
 }

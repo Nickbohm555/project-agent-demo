@@ -5,7 +5,9 @@ Minimal scaffold for learning OpenClaw-style agent architecture by building it e
 ## What this includes
 
 - Basic web chat UI (React + Vite)
+- Secondary Terminal tab for direct Codex session control (`start` / `continue` / `status` / `stop`)
 - API layer (`/api/chat/history`, `/api/chat/send`)
+- Codex terminal API (`POST /api/codex/execute`)
 - Chat service layer with session state and run IDs
 - Runtime adapter boundary:
   - `embedded-pi` runtime (default) for `@mariozechner/pi-*` (starts with no tools; optional CLI tool)
@@ -107,6 +109,11 @@ Codex terminal persistence:
 Live streaming:
 - UI subscribes to `/api/chat/stream?sessionId=...` (SSE)
 - tool stdout/stderr and assistant deltas stream into the chat UI in real time
+
+Terminal tab behavior:
+- `Start/Send`: starts Codex session if needed, then sends prompt as `continue`
+- `Status`: checks whether the persistent Codex session is running
+- `Stop`: stops the persistent Codex session for the current thread
 
 ### Agent debug logging
 

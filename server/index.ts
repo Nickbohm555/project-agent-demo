@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { loadEnvironmentFromDotenv } from "./config/load-env.js";
+import { buildCodexRouter } from "./agent/codexRouter.js";
 import { buildRuntimeContext } from "./agent/runtimeFactory.js";
 import { getConfiguredToolNames, getToolCatalog } from "./agent/toolConfig.js";
 import { ChatEventBus } from "./chat/chatEvents.js";
@@ -56,6 +57,7 @@ app.get("/api/agent/runtime", (_req, res) => {
 });
 
 app.use("/api/chat", buildChatRouter(chatService, eventBus));
+app.use("/api/codex", buildCodexRouter(toolConfig));
 
 app.listen(port, () => {
   console.log(

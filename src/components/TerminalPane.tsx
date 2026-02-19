@@ -1,0 +1,131 @@
+import { FormEvent, useMemo, useState } from "react";
+import { executeCodexAction } from "../lib/api";
+import type { CodexAction } from "../types/chat";
+import { TerminalComposer } from "./terminal/TerminalComposer";
+import { TerminalHeader } from "./terminal/TerminalHeader";
+import { TerminalLog } from "./terminal/TerminalLog";
+import type { TerminalLine } from "./terminal/types";
+
+type TerminalPaneProps = {
+  sessionId: string;
+};
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export function TerminalPane({ sessionId }: TerminalPaneProps) {
+  const [prompt, setPrompt] = useState("");
+  const [running, setRunning] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [lines, setLines] = useState<TerminalLine[]>([
+    {
+      id: `boot-${Date.now()}`,
+      kind: "info",
+      text: "Codex terminal ready. Use Start/Send to begin a persistent Codex session.",
+      createdAt: nowIso(),
+    },
+  ]);
+
+  const canSend = useMemo(() => !busy && prompt.trim().length > 0, [busy, prompt]);
+
+  function append(kind: TerminalLine["kind"], text: string) {
+    setLines((current) => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind,
+        text,
+        createdAt: nowIso(),
+      },
+    ]);
+  }
+
+  async function runAction(action: CodexAction, withPrompt?: string) {
+    setBusy(true);
+    try {
+      const response = await executeCodexAction({
+        sessionId,
+        action,
+        prompt: withPrompt,
+      });
+
+      if (action === "start" || action === "status") {
+        const isRunning = typeof response.details?.running === "boolean" ? Boolean(response.details.running) : running;
+        setRunning(isRunning);
+      }
+      if (action === "stop") {
+        setRunning(false);
+      }
+      if (action === "continue") {
+        setRunning(true);
+      }
+
+      const streamText = response.streamText.trim();
+      const text = response.text.trim();
+
+      if (streamText) {
+        append("output", streamText);
+      }
+      if (text) {
+        append("output", text);
+      }
+    } catch (err) {
+      append("error", String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSend) {
+      return;
+    }
+
+    const command = prompt.trim();
+    setPrompt("");
+    append("command", `$ ${command}`);
+
+    if (!running) {
+      await runAction("start");
+    }
+    await runAction("continue", command);
+  }
+
+  async function onStatus() {
+    append("info", "Checking Codex session status...");
+    await runAction("status");
+  }
+
+  async function onStop() {
+    append("info", "Stopping Codex session...");
+    await runAction("stop");
+  }
+
+  function onClear() {
+    setLines([]);
+  }
+
+  return (
+    <section className="terminal-shell" aria-label="Codex terminal">
+      <TerminalHeader
+        sessionId={sessionId}
+        busy={busy}
+        running={running}
+        onStatus={onStatus}
+        onStop={onStop}
+        onClear={onClear}
+      />
+      <TerminalLog lines={lines} />
+      <TerminalComposer
+        prompt={prompt}
+        busy={busy}
+        running={running}
+        canSend={canSend}
+        onPromptChange={setPrompt}
+        onSubmit={onSubmit}
+      />
+    </section>
+  );
+}

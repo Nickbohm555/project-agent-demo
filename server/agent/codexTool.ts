@@ -65,6 +65,7 @@ export function createCodexTool(options: {
         threadId: options.threadId,
         action,
         cwd,
+        prompt: params.prompt ?? null,
         promptChars: (params.prompt ?? "").trim().length,
       });
 
@@ -158,6 +159,13 @@ export function createCodexTool(options: {
       try {
         let streamChunks = 0;
         let streamChars = 0;
+        codexLog("info", "execute.continue.begin", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          prompt,
+          promptChars: prompt.length,
+        });
         const result = await options.sessionStore.continue(options.threadId, cwd, {
           prompt,
           timeoutMs: 10 * 60 * 1000,
@@ -166,6 +174,15 @@ export function createCodexTool(options: {
           onChunk: (text) => {
             streamChunks += 1;
             streamChars += text.length;
+            codexLog("info", "execute.continue.stream", {
+              toolCallId,
+              threadId: options.threadId,
+              action,
+              chunkIndex: streamChunks,
+              chunkChars: text.length,
+              totalStreamChars: streamChars,
+              chunkPreview: text.slice(0, 200),
+            });
             onUpdate?.({
               content: [{ type: "text" as const, text }],
               details: {

@@ -50,3 +50,21 @@ export type AgentRuntimeInfo = {
   };
   loggingFlags?: Record<string, string>;
 };
+
+export type CodexAction = "start" | "continue" | "stop" | "status";
+
+export type CodexExecuteRequest = {
+  sessionId: string;
+  action: CodexAction;
+  prompt?: string;
+};
+
+export type CodexExecuteResponse = {
+  ok: boolean;
+  sessionId: string;
+  action: CodexAction;
+  text: string;
+  streamText: string;
+  details: Record<string, unknown> | null;
+  timestamp: string;
+};

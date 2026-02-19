@@ -6,6 +6,10 @@ import { CodexSessionStore } from "./codexSessionStore.js";
 
 const codexSessionStore = new CodexSessionStore();
 
+export function getCodexSessionStore(): CodexSessionStore {
+  return codexSessionStore;
+}
+
 function envFlag(name: string): boolean {
   const value = process.env[name]?.trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
