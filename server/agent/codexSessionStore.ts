@@ -58,6 +58,7 @@ type CodexSessionRecord = {
 
 const MAX_OUTPUT_TAIL = 8_000;
 const DEFAULT_BACKEND_COOLDOWN_MS = 30_000;
+const DEFAULT_FIRST_EVENT_TIMEOUT_MS = 6_000;
 
 function nowIso() {
   return new Date().toISOString();
@@ -137,6 +138,7 @@ export class CodexSessionStore {
   private backendUnavailableUntilByThread = new Map<string, number>();
   private backendUnavailableReasonByThread = new Map<string, string>();
   private backendCooldownMs = envPositiveInt("PI_CODEX_BACKEND_COOLDOWN_MS", DEFAULT_BACKEND_COOLDOWN_MS);
+  private firstEventTimeoutMs = envPositiveInt("PI_CODEX_FIRST_EVENT_TIMEOUT_MS", DEFAULT_FIRST_EVENT_TIMEOUT_MS);
 
   private markBackendUnavailable(threadId: string, reason: string) {
     this.backendUnavailableUntilByThread.set(threadId, Date.now() + this.backendCooldownMs);
@@ -275,11 +277,13 @@ export class CodexSessionStore {
       let stdoutRest = "";
       let stderrRest = "";
       let done = false;
+      let sawAnyEvent = false;
 
       const includeReasoning = envFlag("PI_CODEX_INCLUDE_REASONING", false);
 
       const cleanup = () => {
         clearTimeout(timeout);
+        clearTimeout(firstEventTimeout);
         params.signal?.removeEventListener("abort", onAbort);
       };
 
@@ -334,6 +338,7 @@ export class CodexSessionStore {
       };
 
       const onStdout = (buffer: Buffer) => {
+        sawAnyEvent = true;
         const chunk = buffer.toString("utf8");
         if (!chunk) {
           return;
@@ -359,6 +364,7 @@ export class CodexSessionStore {
       };
 
       const onStderr = (buffer: Buffer) => {
+        sawAnyEvent = true;
         const chunk = buffer.toString("utf8");
         if (!chunk) {
           return;
@@ -392,6 +398,17 @@ export class CodexSessionStore {
         child.kill("SIGTERM");
         finish(new Error(`Codex continue timed out after ${params.timeoutMs}ms`));
       }, params.timeoutMs);
+      const firstEventTimeout = setTimeout(() => {
+        if (sawAnyEvent) {
+          return;
+        }
+        child.kill("SIGTERM");
+        finish(
+          new Error(
+            `Codex produced no initial event within ${this.firstEventTimeoutMs}ms. This usually indicates backend connectivity issues from the runtime environment.`,
+          ),
+        );
+      }, this.firstEventTimeoutMs);
 
       params.signal?.addEventListener("abort", onAbort);
       child.stdout?.on("data", onStdout);
