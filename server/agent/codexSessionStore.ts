@@ -1,5 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createRequire } from "node:module";
+import { spawn, type ChildProcess } from "node:child_process";
 
 type StreamChunkHandler = (text: string) => void;
 
@@ -13,23 +12,6 @@ type ContinueParams = {
 
 type ContinueResult = {
   output: string;
-};
-
-type Disposable = {
-  dispose: () => void;
-};
-
-type ExitEvent = {
-  exitCode?: number;
-  signal?: number | string;
-};
-
-type CodexProcess = {
-  pid?: number;
-  write: (text: string) => void;
-  kill: () => void;
-  onData: (handler: (text: string) => void) => Disposable;
-  onExit: (handler: (event: ExitEvent) => void) => Disposable;
 };
 
 type CodexExitInfo = {
@@ -50,18 +32,31 @@ type StartResult = {
   error?: string;
 };
 
+type SessionStatus =
+  | {
+      running: false;
+      threadId: string;
+      pid: undefined;
+      lastExit: CodexExitInfo | undefined;
+    }
+  | {
+      running: true;
+      threadId: string;
+      cwd: string;
+      pid: undefined;
+      lastUsedAt: string;
+      codexThreadId: string | null;
+    };
+
 type CodexSessionRecord = {
   threadId: string;
   cwd: string;
-  process: CodexProcess;
-  transport: "pty" | "pipe";
   queue: Promise<void>;
   lastUsedAt: string;
-  outputTail: string;
+  codexThreadId?: string;
 };
 
 const MAX_OUTPUT_TAIL = 8_000;
-const require = createRequire(import.meta.url);
 
 function nowIso() {
   return new Date().toISOString();
@@ -75,126 +70,172 @@ function ensurePrompt(prompt: string): string {
   return normalized;
 }
 
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (value == null || value === "") {
+    return defaultValue;
+  }
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+function trimTail(text: string, extra: string): string {
+  return `${text}${extra}`.slice(-MAX_OUTPUT_TAIL);
+}
+
+type CodexJsonEvent = {
+  type?: string;
+  thread_id?: string;
+  item?: {
+    type?: string;
+    text?: string;
+  };
+};
+
+function parseJsonLine(line: string): CodexJsonEvent | null {
+  try {
+    return JSON.parse(line) as CodexJsonEvent;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeLineBreaks(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function splitCompleteLines(buffer: string): { lines: string[]; rest: string } {
+  const normalized = normalizeLineBreaks(buffer);
+  const parts = normalized.split("\n");
+  const rest = parts.pop() ?? "";
+  return { lines: parts, rest };
+}
+
 export class CodexSessionStore {
   private sessions = new Map<string, CodexSessionRecord>();
   private lastExitByThread = new Map<string, CodexExitInfo>();
-  private warnedAboutPtyFallback = false;
-  private forceOneShotByThread = new Set<string>();
 
-  private createPtyProcess(cwd: string): { process: CodexProcess; transport: "pty" } {
-    const nodePty = require("@lydell/node-pty") as {
-      spawn: (
-        file: string,
-        args: string[],
-        options: {
-          name: string;
-          cols: number;
-          rows: number;
-          cwd: string;
-          env: NodeJS.ProcessEnv;
-        },
-      ) => {
-        pid: number;
-        write: (text: string) => void;
-        kill: () => void;
-        onData: (handler: (text: string) => void) => Disposable;
-        onExit: (handler: (event: ExitEvent) => void) => Disposable;
+  start(threadId: string, cwd: string): StartResult {
+    const existing = this.sessions.get(threadId);
+    if (existing) {
+      existing.lastUsedAt = nowIso();
+      if (existing.cwd !== cwd) {
+        existing.cwd = cwd;
+      }
+      return {
+        started: false,
+        running: true,
+        threadId,
+        cwd: existing.cwd,
       };
-    };
+    }
 
-    const pty = nodePty.spawn("codex", ["--dangerously-bypass-approvals-and-sandbox"], {
-      name: "xterm-256color",
-      cols: 140,
-      rows: 40,
+    const record: CodexSessionRecord = {
+      threadId,
       cwd,
-      env: process.env,
-    });
+      queue: Promise.resolve(),
+      lastUsedAt: nowIso(),
+    };
+    this.sessions.set(threadId, record);
 
     return {
-      process: {
-        pid: pty.pid,
-        write: (text: string) => pty.write(text),
-        kill: () => pty.kill(),
-        onData: (handler) => pty.onData(handler),
-        onExit: (handler) => pty.onExit(handler),
-      },
-      transport: "pty",
+      started: true,
+      running: true,
+      threadId,
+      cwd,
     };
   }
 
-  private createPipeProcess(cwd: string): { process: CodexProcess; transport: "pipe" } {
-    const child: ChildProcessWithoutNullStreams = spawn(
-      "codex",
-      ["--dangerously-bypass-approvals-and-sandbox"],
-      {
-        cwd,
-        env: process.env,
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
+  status(threadId: string): SessionStatus {
+    const existing = this.sessions.get(threadId);
+    if (!existing) {
+      return {
+        running: false,
+        threadId,
+        pid: undefined,
+        lastExit: this.lastExitByThread.get(threadId),
+      };
+    }
 
     return {
-      process: {
-        pid: child.pid ?? undefined,
-        write: (text: string) => {
-          child.stdin.write(text);
-        },
-        kill: () => {
-          child.kill("SIGTERM");
-        },
-        onData: (handler) => {
-          const onStdout = (buffer: Buffer) => handler(buffer.toString("utf8"));
-          const onStderr = (buffer: Buffer) => handler(buffer.toString("utf8"));
-          child.stdout.on("data", onStdout);
-          child.stderr.on("data", onStderr);
-          return {
-            dispose: () => {
-              child.stdout.off("data", onStdout);
-              child.stderr.off("data", onStderr);
-            },
-          };
-        },
-        onExit: (handler) => {
-          const onClose = (exitCode: number | null, signal: NodeJS.Signals | null) => {
-            handler({
-              exitCode: exitCode ?? undefined,
-              signal: signal ?? undefined,
-            });
-          };
-          child.on("close", onClose);
-          return {
-            dispose: () => {
-              child.off("close", onClose);
-            },
-          };
-        },
-      },
-      transport: "pipe",
+      running: true,
+      threadId,
+      cwd: existing.cwd,
+      pid: undefined,
+      lastUsedAt: existing.lastUsedAt,
+      codexThreadId: existing.codexThreadId ?? null,
     };
   }
 
-  private pushTail(current: string, chunk: string): string {
-    return `${current}${chunk}`.slice(-MAX_OUTPUT_TAIL);
+  stop(threadId: string) {
+    const existing = this.sessions.get(threadId);
+    if (!existing) {
+      return {
+        stopped: false,
+        running: false,
+        threadId,
+      };
+    }
+
+    this.sessions.delete(threadId);
+    return {
+      stopped: true,
+      running: false,
+      threadId,
+    };
   }
 
-  private shouldUseOneShot(error: unknown): boolean {
-    const text = String(error).toLowerCase();
-    return (
-      text.includes("stdin is not a terminal") ||
-      text.includes("cursor position could not be read")
+  async continue(threadId: string, cwd: string, params: ContinueParams): Promise<ContinueResult> {
+    const prompt = ensurePrompt(params.prompt);
+    const startResult = this.start(threadId, cwd);
+    if (!startResult.running) {
+      throw new Error(startResult.error || "Failed to initialize Codex session");
+    }
+
+    const record = this.sessions.get(threadId);
+    if (!record) {
+      throw new Error("Failed to acquire Codex session");
+    }
+
+    const run = async () => {
+      const result = await this.executeTurn(record, prompt, params);
+      record.lastUsedAt = nowIso();
+      return result;
+    };
+
+    const task = record.queue.then(run, run);
+    record.queue = task.then(
+      () => undefined,
+      () => undefined,
     );
+    return task;
   }
 
-  private executeOneShot(cwd: string, params: ContinueParams): Promise<ContinueResult> {
+  private executeTurn(record: CodexSessionRecord, prompt: string, params: ContinueParams): Promise<ContinueResult> {
+    const baseArgs = [
+      "--json",
+      "--skip-git-repo-check",
+      "--dangerously-bypass-approvals-and-sandbox",
+    ];
+
+    const args = record.codexThreadId
+      ? ["exec", "resume", ...baseArgs, record.codexThreadId, prompt]
+      : ["exec", ...baseArgs, prompt];
+
     return new Promise<ContinueResult>((resolve, reject) => {
-      const child = spawn("codex", ["--dangerously-bypass-approvals-and-sandbox", params.prompt], {
-        cwd,
+      const child: ChildProcess = spawn("codex", args, {
+        cwd: record.cwd,
         env: process.env,
         stdio: ["ignore", "pipe", "pipe"],
       });
 
-      const chunks: string[] = [];
+      const messages: string[] = [];
+      const diagnostics: string[] = [];
+      let outputTail = "";
+      let stdoutRest = "";
+      let stderrRest = "";
       let done = false;
+
+      const includeReasoning = envFlag("PI_CODEX_INCLUDE_REASONING", false);
 
       const cleanup = () => {
         clearTimeout(timeout);
@@ -211,277 +252,146 @@ export class CodexSessionStore {
           reject(err);
           return;
         }
-        resolve({ output: (output ?? "").trim() });
+        resolve({ output: output?.trim() || "" });
       };
 
-      const onChunk = (buffer: Buffer) => {
-        const text = buffer.toString("utf8");
+      const pushDiagnostic = (line: string) => {
+        const normalized = line.trim();
+        if (!normalized) {
+          return;
+        }
+        diagnostics.push(normalized);
+        outputTail = trimTail(outputTail, `${normalized}\n`);
+      };
+
+      const onJsonEvent = (event: CodexJsonEvent) => {
+        if (event.type === "thread.started" && typeof event.thread_id === "string" && event.thread_id) {
+          record.codexThreadId = event.thread_id;
+          return;
+        }
+
+        if (event.type !== "item.completed") {
+          return;
+        }
+
+        const itemType = event.item?.type;
+        const text = typeof event.item?.text === "string" ? event.item.text.trim() : "";
         if (!text) {
           return;
         }
-        chunks.push(text);
-        params.onChunk?.(text);
+
+        if (itemType === "agent_message" || (includeReasoning && itemType === "reasoning")) {
+          messages.push(text);
+          params.onChunk?.(text);
+          outputTail = trimTail(outputTail, `${text}\n`);
+          return;
+        }
+
+        if (itemType && itemType !== "reasoning") {
+          pushDiagnostic(`${itemType}: ${text}`);
+        }
+      };
+
+      const onStdout = (buffer: Buffer) => {
+        const chunk = buffer.toString("utf8");
+        if (!chunk) {
+          return;
+        }
+
+        const split = splitCompleteLines(stdoutRest + chunk);
+        stdoutRest = split.rest;
+
+        for (const line of split.lines) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
+          }
+
+          const parsed = parseJsonLine(trimmed);
+          if (parsed) {
+            onJsonEvent(parsed);
+            continue;
+          }
+
+          pushDiagnostic(trimmed);
+        }
+      };
+
+      const onStderr = (buffer: Buffer) => {
+        const chunk = buffer.toString("utf8");
+        if (!chunk) {
+          return;
+        }
+
+        const split = splitCompleteLines(stderrRest + chunk);
+        stderrRest = split.rest;
+
+        for (const line of split.lines) {
+          pushDiagnostic(line);
+        }
       };
 
       const onAbort = () => {
         child.kill("SIGTERM");
-        finish(new Error("Codex one-shot aborted"));
+        finish(new Error("Codex continue aborted"));
       };
 
       const timeout = setTimeout(() => {
         child.kill("SIGTERM");
-        finish(new Error(`Codex one-shot timed out after ${params.timeoutMs}ms`));
+        finish(new Error(`Codex continue timed out after ${params.timeoutMs}ms`));
       }, params.timeoutMs);
 
       params.signal?.addEventListener("abort", onAbort);
-      child.stdout.on("data", onChunk);
-      child.stderr.on("data", onChunk);
-      child.on("error", (err) => finish(err));
-      child.on("close", (code) => {
-        const output = chunks.join("");
-        if (code === 0) {
+      child.stdout?.on("data", onStdout);
+      child.stderr?.on("data", onStderr);
+      child.on("error", (err) => {
+        this.lastExitByThread.set(record.threadId, {
+          threadId: record.threadId,
+          cwd: record.cwd,
+          outputTail,
+          exitedAt: nowIso(),
+        });
+        finish(err);
+      });
+      child.on("close", (exitCode, signal) => {
+        if (stdoutRest.trim()) {
+          const parsed = parseJsonLine(stdoutRest.trim());
+          if (parsed) {
+            onJsonEvent(parsed);
+          } else {
+            pushDiagnostic(stdoutRest.trim());
+          }
+          stdoutRest = "";
+        }
+        if (stderrRest.trim()) {
+          pushDiagnostic(stderrRest.trim());
+          stderrRest = "";
+        }
+
+        this.lastExitByThread.set(record.threadId, {
+          threadId: record.threadId,
+          cwd: record.cwd,
+          exitCode: exitCode ?? undefined,
+          signal: signal ?? undefined,
+          outputTail,
+          exitedAt: nowIso(),
+        });
+
+        const output = messages.join("\n\n").trim();
+        if ((exitCode ?? 0) !== 0) {
+          const details = diagnostics.slice(-20).join("\n").trim() || outputTail || `Codex exited with code ${exitCode}`;
+          finish(new Error(details));
+          return;
+        }
+
+        if (output) {
           finish(undefined, output);
           return;
         }
-        const details = output.trim() || `Codex one-shot exited with code ${code}`;
-        finish(new Error(details));
+
+        const fallback = diagnostics.slice(-10).join("\n").trim();
+        finish(undefined, fallback || "Codex prompt completed with no output.");
       });
-    });
-  }
-
-  start(threadId: string, cwd: string): StartResult {
-    const existing = this.sessions.get(threadId);
-    if (existing) {
-      existing.lastUsedAt = nowIso();
-      return {
-        started: false,
-        running: true,
-        threadId,
-        cwd: existing.cwd,
-        pid: existing.process.pid,
-      };
-    }
-
-    let processInfo: { process: CodexProcess; transport: "pty" | "pipe" };
-    try {
-      try {
-        processInfo = this.createPtyProcess(cwd);
-      } catch {
-        processInfo = this.createPipeProcess(cwd);
-        if (!this.warnedAboutPtyFallback) {
-          this.warnedAboutPtyFallback = true;
-          console.warn("[codex] @lydell/node-pty unavailable; using child_process fallback");
-        }
-      }
-    } catch (err) {
-      return {
-        started: false,
-        running: false,
-        threadId,
-        cwd,
-        error: `Failed to start Codex session: ${String(err)}`,
-      };
-    }
-
-    const record: CodexSessionRecord = {
-      threadId,
-      cwd,
-      process: processInfo.process,
-      transport: processInfo.transport,
-      queue: Promise.resolve(),
-      lastUsedAt: nowIso(),
-      outputTail: "",
-    };
-
-    record.process.onData((chunk) => {
-      if (!chunk) {
-        return;
-      }
-      record.outputTail = this.pushTail(record.outputTail, chunk);
-    });
-
-    record.process.onExit((event) => {
-      const exitInfo: CodexExitInfo = {
-        threadId,
-        cwd: record.cwd,
-        exitCode: event.exitCode,
-        signal: event.signal,
-        outputTail: record.outputTail,
-        exitedAt: nowIso(),
-      };
-      this.lastExitByThread.set(threadId, exitInfo);
-      console.error("[codex] session exited", exitInfo);
-      this.sessions.delete(threadId);
-    });
-
-    this.sessions.set(threadId, record);
-
-    return {
-      started: true,
-      running: true,
-      threadId,
-      cwd,
-      pid: record.process.pid,
-    };
-  }
-
-  status(threadId: string) {
-    const existing = this.sessions.get(threadId);
-    if (!existing) {
-      return {
-        running: false,
-        threadId,
-        lastExit: this.lastExitByThread.get(threadId),
-      };
-    }
-
-    return {
-      running: true,
-      threadId,
-      cwd: existing.cwd,
-      pid: existing.process.pid,
-      lastUsedAt: existing.lastUsedAt,
-      transport: existing.transport,
-      outputTail: existing.outputTail,
-    };
-  }
-
-  stop(threadId: string) {
-    const existing = this.sessions.get(threadId);
-    if (!existing) {
-      return {
-        stopped: false,
-        running: false,
-        threadId,
-      };
-    }
-
-    try {
-      existing.process.kill();
-    } finally {
-      this.sessions.delete(threadId);
-    }
-    return {
-      stopped: true,
-      running: false,
-      threadId,
-    };
-  }
-
-  async continue(threadId: string, cwd: string, params: ContinueParams): Promise<ContinueResult> {
-    if (this.forceOneShotByThread.has(threadId)) {
-      return this.executeOneShot(cwd, params);
-    }
-
-    const startResult = this.start(threadId, cwd);
-    if (!startResult.running) {
-      return this.executeOneShot(cwd, params);
-    }
-
-    const record = this.sessions.get(threadId);
-    if (!record) {
-      throw new Error("Failed to acquire Codex session");
-    }
-
-    const run = async () => {
-      try {
-        return await this.continueInRecord(record, params);
-      } catch (err) {
-        if (!this.shouldUseOneShot(err)) {
-          throw err;
-        }
-        this.forceOneShotByThread.add(threadId);
-        this.stop(threadId);
-        console.warn(
-          `[codex] falling back to one-shot mode for thread=${threadId} due to non-interactive terminal error`,
-        );
-        return this.executeOneShot(cwd, params);
-      }
-    };
-    const task = record.queue.then(run, run);
-    record.queue = task.then(
-      () => undefined,
-      () => undefined,
-    );
-    return task;
-  }
-
-  private continueInRecord(record: CodexSessionRecord, params: ContinueParams): Promise<ContinueResult> {
-    const prompt = ensurePrompt(params.prompt);
-
-    return new Promise<ContinueResult>((resolve, reject) => {
-      let output = "";
-      let done = false;
-
-      const finish = () => {
-        if (done) {
-          return;
-        }
-        done = true;
-        cleanup();
-        record.lastUsedAt = nowIso();
-        resolve({ output: output.trim() });
-      };
-
-      const fail = (error: Error) => {
-        if (done) {
-          return;
-        }
-        done = true;
-        cleanup();
-        reject(error);
-      };
-
-      const resetIdle = () => {
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(finish, params.idleMs);
-      };
-
-      const onData = (text: string) => {
-        if (!text) {
-          return;
-        }
-        output += text;
-        params.onChunk?.(text);
-        resetIdle();
-      };
-
-      const onAbort = () => {
-        record.process.write("\u0003");
-        fail(new Error("Codex continue aborted"));
-      };
-
-      const onExit = () => {
-        const exit = this.lastExitByThread.get(record.threadId);
-        const outputTail = (exit?.outputTail || output || record.outputTail).slice(-MAX_OUTPUT_TAIL);
-        const errorText = [
-          `Codex session process exited during continue (thread=${record.threadId}, cwd=${record.cwd}, exitCode=${exit?.exitCode ?? "unknown"}, signal=${exit?.signal ?? "unknown"})`,
-          outputTail ? `Recent output:\n${outputTail}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        fail(new Error(errorText));
-      };
-
-      const cleanup = () => {
-        clearTimeout(hardTimeout);
-        clearTimeout(idleTimer);
-        dataDisposable.dispose();
-        exitDisposable.dispose();
-        params.signal?.removeEventListener("abort", onAbort);
-      };
-
-      const hardTimeout = setTimeout(() => {
-        fail(new Error(`Codex continue timed out after ${params.timeoutMs}ms`));
-      }, params.timeoutMs);
-
-      let idleTimer = setTimeout(finish, params.idleMs);
-
-      const dataDisposable = record.process.onData(onData);
-      const exitDisposable = record.process.onExit(onExit);
-      params.signal?.addEventListener("abort", onAbort);
-
-      record.process.write(`${prompt}\n`);
     });
   }
 }
