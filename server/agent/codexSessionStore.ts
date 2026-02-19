@@ -57,6 +57,7 @@ type CodexSessionRecord = {
 };
 
 const MAX_OUTPUT_TAIL = 8_000;
+const DEFAULT_BACKEND_COOLDOWN_MS = 30_000;
 
 function nowIso() {
   return new Date().toISOString();
@@ -110,9 +111,31 @@ function splitCompleteLines(buffer: string): { lines: string[]; rest: string } {
   return { lines: parts, rest };
 }
 
+function envPositiveInt(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (!raw) {
+    return defaultValue;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
+function isUpstreamConnectivityError(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    normalized.includes("failed to refresh available models") ||
+    normalized.includes("stream disconnected before completion") ||
+    normalized.includes("error sending request for url") ||
+    normalized.includes("connection reset") ||
+    normalized.includes("timed out")
+  );
+}
+
 export class CodexSessionStore {
   private sessions = new Map<string, CodexSessionRecord>();
   private lastExitByThread = new Map<string, CodexExitInfo>();
+  private backendUnavailableUntilByThread = new Map<string, number>();
+  private backendUnavailableReasonByThread = new Map<string, string>();
 
   start(threadId: string, cwd: string): StartResult {
     const existing = this.sessions.get(threadId);
@@ -186,6 +209,14 @@ export class CodexSessionStore {
 
   async continue(threadId: string, cwd: string, params: ContinueParams): Promise<ContinueResult> {
     const prompt = ensurePrompt(params.prompt);
+    const unavailableUntil = this.backendUnavailableUntilByThread.get(threadId) ?? 0;
+    if (Date.now() < unavailableUntil) {
+      const seconds = Math.ceil((unavailableUntil - Date.now()) / 1000);
+      const reason = this.backendUnavailableReasonByThread.get(threadId);
+      throw new Error(
+        `Codex backend currently unavailable. Retry in ~${seconds}s.${reason ? ` Last error: ${reason}` : ""}`,
+      );
+    }
     const startResult = this.start(threadId, cwd);
     if (!startResult.running) {
       throw new Error(startResult.error || "Failed to initialize Codex session");
@@ -380,9 +411,17 @@ export class CodexSessionStore {
         const output = messages.join("\n\n").trim();
         if ((exitCode ?? 0) !== 0) {
           const details = diagnostics.slice(-20).join("\n").trim() || outputTail || `Codex exited with code ${exitCode}`;
+          if (isUpstreamConnectivityError(details)) {
+            const cooldownMs = envPositiveInt("PI_CODEX_BACKEND_COOLDOWN_MS", DEFAULT_BACKEND_COOLDOWN_MS);
+            this.backendUnavailableUntilByThread.set(record.threadId, Date.now() + cooldownMs);
+            this.backendUnavailableReasonByThread.set(record.threadId, details.slice(0, 500));
+          }
           finish(new Error(details));
           return;
         }
+
+        this.backendUnavailableUntilByThread.delete(record.threadId);
+        this.backendUnavailableReasonByThread.delete(record.threadId);
 
         if (output) {
           finish(undefined, output);
