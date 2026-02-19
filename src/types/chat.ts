@@ -35,3 +35,18 @@ export type ChatStreamEvent = {
   toolName?: string;
   timestamp: string;
 };
+
+export type AgentRuntimeInfo = {
+  runtime: string;
+  configuredTools?: string[];
+  toolCatalog?: Array<{
+    name: string;
+    kind: "built-in" | "custom";
+    enabled: boolean;
+  }>;
+  toolConfig?: {
+    cliToolEnabled?: boolean;
+    codexToolEnabled?: boolean;
+  };
+  loggingFlags?: Record<string, string>;
+};

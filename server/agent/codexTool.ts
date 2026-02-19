@@ -21,6 +21,30 @@ type CodexToolInput = {
   prompt?: string;
 };
 
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (value == null || value === "") {
+    return defaultValue;
+  }
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+function codexLog(level: "info" | "warn" | "error", event: string, details: Record<string, unknown>) {
+  if (!envFlag("PI_LOG_CODEX_TOOL", true)) {
+    return;
+  }
+  const line = `[codex-tool] ${event} ${JSON.stringify(details)}`;
+  if (level === "error") {
+    console.error(line);
+    return;
+  }
+  if (level === "warn") {
+    console.warn(line);
+    return;
+  }
+  console.log(line);
+}
+
 export function createCodexTool(options: {
   defaultCwd: string;
   threadId: string;
@@ -32,9 +56,17 @@ export function createCodexTool(options: {
     description:
       "Manage a long-lived Codex CLI session for the current chat session. Actions: start, continue, stop, status. Do not ask the user for threadId/session identifiers; they are provided internally by the server.",
     parameters: codexToolSchema,
-    execute: async (_toolCallId, params: CodexToolInput, signal, onUpdate) => {
+    execute: async (toolCallId, params: CodexToolInput, signal, onUpdate) => {
+      const startedAtMs = Date.now();
       const action = params.action ?? (params.prompt ? "continue" : "status");
       const cwd = options.defaultCwd;
+      codexLog("info", "execute.start", {
+        toolCallId,
+        threadId: options.threadId,
+        action,
+        cwd,
+        promptChars: (params.prompt ?? "").trim().length,
+      });
 
       if (action === "start") {
         const status = options.sessionStore.start(options.threadId, cwd);
@@ -43,13 +75,24 @@ export function createCodexTool(options: {
             ? `Started Codex session for thread ${options.threadId} (pid=${status.pid ?? "unknown"}) in ${cwd}`
             : `Codex session already running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`
           : `Failed to start Codex session for thread ${options.threadId}: ${status.error ?? "unknown error"}`;
-        return {
-          content: [{ type: "text", text }],
+        const result = {
+          content: [{ type: "text" as const, text }],
           details: {
             action,
             ...status,
           },
         };
+        codexLog(status.running ? "info" : "error", "execute.start.result", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          running: status.running,
+          started: status.started,
+          pid: status.pid ?? null,
+          elapsedMs: Date.now() - startedAtMs,
+          error: status.error ?? null,
+        });
+        return result;
       }
 
       if (action === "status") {
@@ -61,13 +104,22 @@ export function createCodexTool(options: {
         const text = status.running
           ? `Codex session is running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`
           : `No Codex session running for thread ${options.threadId}.${exitInfo}`;
-        return {
-          content: [{ type: "text", text }],
+        const result = {
+          content: [{ type: "text" as const, text }],
           details: {
             action,
             ...status,
           },
         };
+        codexLog("info", "execute.status.result", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          running: status.running,
+          pid: "pid" in status ? (status.pid ?? null) : null,
+          elapsedMs: Date.now() - startedAtMs,
+        });
+        return result;
       }
 
       if (action === "stop") {
@@ -75,29 +127,47 @@ export function createCodexTool(options: {
         const text = stopped.stopped
           ? `Stopped Codex session for thread ${options.threadId}`
           : `No Codex session to stop for thread ${options.threadId}`;
-        return {
-          content: [{ type: "text", text }],
+        const result = {
+          content: [{ type: "text" as const, text }],
           details: {
             action,
             ...stopped,
           },
         };
+        codexLog(stopped.stopped ? "info" : "warn", "execute.stop.result", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          stopped: stopped.stopped,
+          elapsedMs: Date.now() - startedAtMs,
+        });
+        return result;
       }
 
       const prompt = (params.prompt ?? "").trim();
       if (!prompt) {
+        codexLog("warn", "execute.continue.invalid_prompt", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          elapsedMs: Date.now() - startedAtMs,
+        });
         throw new Error("codex continue action requires a non-empty prompt");
       }
 
       try {
+        let streamChunks = 0;
+        let streamChars = 0;
         const result = await options.sessionStore.continue(options.threadId, cwd, {
           prompt,
           timeoutMs: 10 * 60 * 1000,
           idleMs: 1_200,
           signal,
           onChunk: (text) => {
+            streamChunks += 1;
+            streamChars += text.length;
             onUpdate?.({
-              content: [{ type: "text", text }],
+              content: [{ type: "text" as const, text }],
               details: {
                 status: "stream",
                 action,
@@ -107,8 +177,17 @@ export function createCodexTool(options: {
           },
         });
 
+        codexLog("info", "execute.continue.result", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          elapsedMs: Date.now() - startedAtMs,
+          streamChunks,
+          streamChars,
+          outputChars: result.output.length,
+        });
         return {
-          content: [{ type: "text", text: result.output || "Codex prompt completed with no output." }],
+          content: [{ type: "text" as const, text: result.output || "Codex prompt completed with no output." }],
           details: {
             action,
             threadId: options.threadId,
@@ -117,8 +196,15 @@ export function createCodexTool(options: {
         };
       } catch (err) {
         const errorText = String(err);
+        codexLog("error", "execute.continue.error", {
+          toolCallId,
+          threadId: options.threadId,
+          action,
+          elapsedMs: Date.now() - startedAtMs,
+          error: errorText,
+        });
         return {
-          content: [{ type: "text", text: `Codex continue failed.\n${errorText}` }],
+          content: [{ type: "text" as const, text: `Codex continue failed.\n${errorText}` }],
           details: {
             action,
             status: "error",

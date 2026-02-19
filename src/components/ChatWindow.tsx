@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { fetchHistory, sendMessage } from "../lib/api";
-import type { ChatMessage, ChatStreamEvent } from "../types/chat";
+import { fetchHistory, fetchRuntimeInfo, sendMessage } from "../lib/api";
+import type { AgentRuntimeInfo, ChatMessage, ChatStreamEvent } from "../types/chat";
 
 type ChatWindowProps = {
   agentId: string;
@@ -15,6 +15,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [error, setError] = useState<string | null>(null);
   const [liveAssistant, setLiveAssistant] = useState("");
   const [liveTool, setLiveTool] = useState("");
+  const [toolCatalog, setToolCatalog] = useState<NonNullable<AgentRuntimeInfo["toolCatalog"]>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +49,40 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
       cancelled = true;
     };
   }, [sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchRuntimeInfo()
+      .then((runtime) => {
+        if (cancelled) {
+          return;
+        }
+        const fullCatalog = Array.isArray(runtime.toolCatalog) ? runtime.toolCatalog : [];
+        if (fullCatalog.length > 0) {
+          setToolCatalog(fullCatalog);
+          return;
+        }
+
+        const fallbackCatalog: NonNullable<AgentRuntimeInfo["toolCatalog"]> = [];
+        if (runtime.toolConfig?.codexToolEnabled) {
+          fallbackCatalog.push({ name: "codex", kind: "custom", enabled: true });
+        }
+        if (runtime.toolConfig?.cliToolEnabled) {
+          fallbackCatalog.push({ name: "bash", kind: "built-in", enabled: true });
+        }
+        setToolCatalog(fallbackCatalog);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setToolCatalog([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}`);
@@ -111,12 +146,28 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   return (
     <main className="chat-shell">
       <header className="chat-header">
-        <h1>Project Agent Demo</h1>
-        <p>
-          OpenClaw-style data flow: UI → API → Service → Embedded Runtime
-          <br />
-          Agent: <strong>{agentId}</strong>
-        </p>
+        <div>
+          <h1>Project Agent Demo</h1>
+          <p>
+            OpenClaw-style data flow: UI → API → Service → Embedded Runtime
+            <br />
+            Agent: <strong>{agentId}</strong>
+          </p>
+        </div>
+        <aside className="tool-badge-panel" aria-label="Available tools">
+          <span className="tool-badge-label">Available tools</span>
+          {toolCatalog.length > 0 ? (
+            <ul className="tool-badge-list">
+              {toolCatalog.map((tool) => (
+                <li key={tool.name} className={tool.enabled ? "tool-enabled" : "tool-disabled"}>
+                  {tool.name} ({tool.kind}) {tool.enabled ? "on" : "off"}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="tool-badge-list-empty">none</span>
+          )}
+        </aside>
       </header>
 
       <section className="chat-log" aria-live="polite">

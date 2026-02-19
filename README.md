@@ -34,9 +34,13 @@ docker compose up --build
 
 Notes:
 - `docker compose` loads variables from `.env` via `env_file`.
-- Container defaults `PI_ENABLE_CODEX_TOOL=false` so the app can run even when `codex` is not installed in the image.
+- Container defaults `PI_ENABLE_CODEX_TOOL=true` so custom Codex tool is available to the agent by default.
 - Vite host binding is controlled by `PAD_WEB_HOST` (defaults to `0.0.0.0` in `docker-compose.yml`).
 - Container defaults `PI_LOG_TOOL_EVENTS=true` so tool lifecycle usage is visible in `docker compose logs -f app`.
+- Container defaults `PI_LOG_CODEX_TOOL=true` so Codex action/error lifecycle logs are visible in container logs.
+- Docker image installs `@openai/codex` CLI so `codex` tool calls can run in-container.
+- After Dockerfile changes, rebuild to refresh the image:
+  `docker compose up --build -d`
 
 ## Runtime mode and model config
 
@@ -115,10 +119,13 @@ PI_LOG_ASSISTANT_DELTAS=true
 PI_LOG_TOOL_EVENTS=true
 # highest verbosity:
 PI_LOG_RAW_EVENTS=true
+# Codex tool action/error logs:
+PI_LOG_CODEX_TOOL=true
 ```
 
 Note: provider-hidden reasoning/thought traces are generally not exposed by APIs.
 These logs show observable agent events, assistant deltas, and tool lifecycle events.
+Codex logs expose action-level steps (start/status/continue/stop), stream stats, and surfaced errors.
 
 Runtime startup logs now include:
 - configured tool list (`codex`, `bash`)

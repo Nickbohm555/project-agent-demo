@@ -1,4 +1,4 @@
-import type { ChatSession, SendChatRequest, SendChatResponse } from "../types/chat";
+import type { AgentRuntimeInfo, ChatSession, SendChatRequest, SendChatResponse } from "../types/chat";
 
 async function getErrorMessage(res: Response, fallback: string): Promise<string> {
   const body = await res.text();
@@ -43,4 +43,12 @@ export async function sendMessage(payload: SendChatRequest): Promise<SendChatRes
   }
 
   return (await res.json()) as SendChatResponse;
+}
+
+export async function fetchRuntimeInfo(): Promise<AgentRuntimeInfo> {
+  const res = await fetch("/api/agent/runtime");
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, `Failed to load runtime info (${res.status})`));
+  }
+  return (await res.json()) as AgentRuntimeInfo;
 }

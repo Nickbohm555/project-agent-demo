@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getConfiguredToolNames, resolveAgentToolConfig } from "../../server/agent/toolConfig.js";
+import { getConfiguredToolNames, getToolCatalog, resolveAgentToolConfig } from "../../server/agent/toolConfig.js";
 
 describe("resolveAgentToolConfig", () => {
   it("defaults with codex tool enabled and cli tool disabled", () => {
@@ -61,5 +61,21 @@ describe("resolveAgentToolConfig", () => {
         codexWorkdir: "/tmp/demo",
       }),
     ).toEqual(["codex", "bash"]);
+  });
+
+  it("returns complete tool catalog with enabled flags", () => {
+    expect(
+      getToolCatalog({
+        cliToolEnabled: false,
+        cliWorkdir: "/tmp/demo",
+        cliTimeoutSeconds: 45,
+        cliAllowedPrefixes: [],
+        codexToolEnabled: true,
+        codexWorkdir: "/tmp/demo",
+      }),
+    ).toEqual([
+      { name: "codex", kind: "custom", enabled: true },
+      { name: "bash", kind: "built-in", enabled: false },
+    ]);
   });
 });

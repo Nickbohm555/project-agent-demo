@@ -35,15 +35,23 @@ export type ResolvedAgentTools = {
   customTools: Array<ToolDefinition<any, any>>;
 };
 
+export type AgentToolDescriptor = {
+  name: string;
+  kind: "built-in" | "custom";
+  enabled: boolean;
+};
+
+export function getToolCatalog(config: AgentToolConfig): AgentToolDescriptor[] {
+  return [
+    { name: "codex", kind: "custom", enabled: config.codexToolEnabled },
+    { name: "bash", kind: "built-in", enabled: config.cliToolEnabled },
+  ];
+}
+
 export function getConfiguredToolNames(config: AgentToolConfig): string[] {
-  const names: string[] = [];
-  if (config.codexToolEnabled) {
-    names.push("codex");
-  }
-  if (config.cliToolEnabled) {
-    names.push("bash");
-  }
-  return names;
+  return getToolCatalog(config)
+    .filter((tool) => tool.enabled)
+    .map((tool) => tool.name);
 }
 
 export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolConfig {
