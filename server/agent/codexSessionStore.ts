@@ -136,6 +136,12 @@ export class CodexSessionStore {
   private lastExitByThread = new Map<string, CodexExitInfo>();
   private backendUnavailableUntilByThread = new Map<string, number>();
   private backendUnavailableReasonByThread = new Map<string, string>();
+  private backendCooldownMs = envPositiveInt("PI_CODEX_BACKEND_COOLDOWN_MS", DEFAULT_BACKEND_COOLDOWN_MS);
+
+  private markBackendUnavailable(threadId: string, reason: string) {
+    this.backendUnavailableUntilByThread.set(threadId, Date.now() + this.backendCooldownMs);
+    this.backendUnavailableReasonByThread.set(threadId, reason.slice(0, 500));
+  }
 
   start(threadId: string, cwd: string): StartResult {
     const existing = this.sessions.get(threadId);
@@ -242,11 +248,15 @@ export class CodexSessionStore {
   }
 
   private executeTurn(record: CodexSessionRecord, prompt: string, params: ContinueParams): Promise<ContinueResult> {
+    const model = process.env.PI_CODEX_MODEL?.trim();
     const baseArgs = [
       "--json",
       "--skip-git-repo-check",
       "--dangerously-bypass-approvals-and-sandbox",
     ];
+    if (model) {
+      baseArgs.push("-m", model);
+    }
 
     const args = record.codexThreadId
       ? ["exec", "resume", ...baseArgs, record.codexThreadId, prompt]
@@ -358,7 +368,18 @@ export class CodexSessionStore {
         stderrRest = split.rest;
 
         for (const line of split.lines) {
-          pushDiagnostic(line);
+          const normalized = line.trim();
+          pushDiagnostic(normalized);
+          if (normalized && isUpstreamConnectivityError(normalized)) {
+            this.markBackendUnavailable(record.threadId, normalized);
+            child.kill("SIGTERM");
+            finish(
+              new Error(
+                `Codex backend unavailable (model refresh request failed). Retrying now is unlikely to help.\n${normalized}`,
+              ),
+            );
+            return;
+          }
         }
       };
 
@@ -412,9 +433,7 @@ export class CodexSessionStore {
         if ((exitCode ?? 0) !== 0) {
           const details = diagnostics.slice(-20).join("\n").trim() || outputTail || `Codex exited with code ${exitCode}`;
           if (isUpstreamConnectivityError(details)) {
-            const cooldownMs = envPositiveInt("PI_CODEX_BACKEND_COOLDOWN_MS", DEFAULT_BACKEND_COOLDOWN_MS);
-            this.backendUnavailableUntilByThread.set(record.threadId, Date.now() + cooldownMs);
-            this.backendUnavailableReasonByThread.set(record.threadId, details.slice(0, 500));
+            this.markBackendUnavailable(record.threadId, details);
           }
           finish(new Error(details));
           return;
