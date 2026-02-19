@@ -24,8 +24,21 @@ export function buildChatRouter(chatService: ChatService, events: ChatEventBus):
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
+    let closed = false;
+    const safeWrite = (chunk: string): boolean => {
+      if (closed || res.destroyed || res.writableEnded) {
+        return false;
+      }
+      try {
+        res.write(chunk);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     const sendEvent = (payload: unknown) => {
-      res.write(`data: ${JSON.stringify(payload)}\\n\\n`);
+      safeWrite(`data: ${JSON.stringify(payload)}\\n\\n`);
     };
 
     const unsubscribe = events.subscribe(sessionId, (event) => {
@@ -33,14 +46,24 @@ export function buildChatRouter(chatService: ChatService, events: ChatEventBus):
     });
 
     const keepAlive = setInterval(() => {
-      res.write(":keepalive\\n\\n");
+      safeWrite(":keepalive\\n\\n");
     }, 20_000);
 
-    req.on("close", () => {
+    const cleanup = () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
       clearInterval(keepAlive);
       unsubscribe();
-      res.end();
-    });
+      if (!res.writableEnded) {
+        res.end();
+      }
+    };
+
+    req.on("close", cleanup);
+    res.on("close", cleanup);
+    res.on("error", cleanup);
   });
 
   router.get("/history", (req, res) => {
@@ -56,12 +79,16 @@ export function buildChatRouter(chatService: ChatService, events: ChatEventBus):
       return;
     }
 
-    const result = await chatService.sendMessage(
-      parsed.data.agentId,
-      parsed.data.sessionId,
-      parsed.data.message,
-    );
-    res.json(result);
+    try {
+      const result = await chatService.sendMessage(
+        parsed.data.agentId,
+        parsed.data.sessionId,
+        parsed.data.message,
+      );
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to send message", details: String(err) });
+    }
   });
 
   return router;

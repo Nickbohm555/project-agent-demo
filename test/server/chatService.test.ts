@@ -15,6 +15,14 @@ class TestRuntime implements AgentRuntime {
   }
 }
 
+class ThrowingRuntime implements AgentRuntime {
+  name = "throwing-runtime";
+
+  async run() {
+    throw new Error("runtime exploded");
+  }
+}
+
 describe("ChatService", () => {
   it("creates a new session with an initialization system message", () => {
     const service = new ChatService(new TestRuntime(), new ChatEventBus());
@@ -33,5 +41,17 @@ describe("ChatService", () => {
     expect(result.session.messages.at(-2)?.role).toBe("user");
     expect(result.session.messages.at(-1)?.role).toBe("assistant");
     expect(result.session.messages.at(-1)?.text).toContain("Test assistant response");
+  });
+
+  it("returns failed run data when runtime throws instead of throwing", async () => {
+    const service = new ChatService(new ThrowingRuntime(), new ChatEventBus());
+
+    const result = await service.sendMessage("agent-a", "s3", "hello");
+
+    expect(result.run.status).toBe("failed");
+    expect(result.session.messages.at(-2)?.role).toBe("user");
+    expect(result.session.messages.at(-1)?.role).toBe("assistant");
+    expect(result.session.messages.at(-1)?.text).toContain("Agent run failed.");
+    expect(result.session.messages.at(-1)?.text).toContain("runtime exploded");
   });
 });

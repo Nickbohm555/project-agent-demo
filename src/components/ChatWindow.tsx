@@ -18,35 +18,32 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
 
   useEffect(() => {
     let cancelled = false;
-    let attempt = 0;
+    let attempts = 0;
     setLoading(true);
-    setError(null);
 
     const load = () => {
       fetchHistory(sessionId)
         .then((session) => {
-          if (!cancelled) {
-            setMessages(session.messages);
-            setLoading(false);
-            setError(null);
-          }
-        })
-        .catch((err) => {
           if (cancelled) {
             return;
           }
-          attempt += 1;
-          if (attempt < 10) {
-            window.setTimeout(load, 700);
+          setMessages(session.messages);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) {
             return;
           }
-          setError(String(err));
+          attempts += 1;
+          if (attempts < 5) {
+            window.setTimeout(load, 500);
+            return;
+          }
           setLoading(false);
         });
     };
 
     load();
-
     return () => {
       cancelled = true;
     };
@@ -124,7 +121,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
 
       <section className="chat-log" aria-live="polite">
         {loading ? <p className="status">Loading chat...</p> : null}
-        {!loading && messages.length === 0 ? <p className="status">No messages yet.</p> : null}
+        {messages.length === 0 ? <p className="status">No messages yet.</p> : null}
 
         {liveTool ? (
           <article className="live-panel">

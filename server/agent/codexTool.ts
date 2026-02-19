@@ -11,7 +11,9 @@ const codexToolSchema = Type.Object({
       Type.Literal("status"),
     ]),
   ),
-  prompt: Type.Optional(Type.String({ description: "Prompt to send when action=continue." })),
+  prompt: Type.Optional(
+    Type.String({ description: "Prompt to send when action=continue. Thread/session binding is internal." }),
+  ),
 });
 
 type CodexToolInput = {
@@ -28,7 +30,7 @@ export function createCodexTool(options: {
     name: "codex",
     label: "Codex Session",
     description:
-      "Manage a long-lived Codex CLI session. Actions: start, continue, stop, status. Continue sends prompt to the existing Codex session.",
+      "Manage a long-lived Codex CLI session for the current chat session. Actions: start, continue, stop, status. Do not ask the user for threadId/session identifiers; they are provided internally by the server.",
     parameters: codexToolSchema,
     execute: async (_toolCallId, params: CodexToolInput, signal, onUpdate) => {
       const action = params.action ?? (params.prompt ? "continue" : "status");
@@ -36,9 +38,11 @@ export function createCodexTool(options: {
 
       if (action === "start") {
         const status = options.sessionStore.start(options.threadId, cwd);
-        const text = status.started
-          ? `Started Codex session for thread ${options.threadId} (pid=${status.pid ?? "unknown"}) in ${cwd}`
-          : `Codex session already running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`;
+        const text = status.running
+          ? status.started
+            ? `Started Codex session for thread ${options.threadId} (pid=${status.pid ?? "unknown"}) in ${cwd}`
+            : `Codex session already running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`
+          : `Failed to start Codex session for thread ${options.threadId}: ${status.error ?? "unknown error"}`;
         return {
           content: [{ type: "text", text }],
           details: {
@@ -50,9 +54,13 @@ export function createCodexTool(options: {
 
       if (action === "status") {
         const status = options.sessionStore.status(options.threadId);
+        const exitInfo =
+          !status.running && status.lastExit
+            ? ` Last exit: code=${status.lastExit.exitCode}, signal=${status.lastExit.signal}, at=${status.lastExit.exitedAt}`
+            : "";
         const text = status.running
           ? `Codex session is running for thread ${options.threadId} (pid=${status.pid ?? "unknown"})`
-          : `No Codex session running for thread ${options.threadId}`;
+          : `No Codex session running for thread ${options.threadId}.${exitInfo}`;
         return {
           content: [{ type: "text", text }],
           details: {
@@ -81,31 +89,45 @@ export function createCodexTool(options: {
         throw new Error("codex continue action requires a non-empty prompt");
       }
 
-      const result = await options.sessionStore.continue(options.threadId, cwd, {
-        prompt,
-        timeoutMs: 10 * 60 * 1000,
-        idleMs: 1_200,
-        signal,
-        onChunk: (text) => {
-          onUpdate?.({
-            content: [{ type: "text", text }],
-            details: {
-              status: "stream",
-              action,
-              threadId: options.threadId,
-            },
-          });
-        },
-      });
+      try {
+        const result = await options.sessionStore.continue(options.threadId, cwd, {
+          prompt,
+          timeoutMs: 10 * 60 * 1000,
+          idleMs: 1_200,
+          signal,
+          onChunk: (text) => {
+            onUpdate?.({
+              content: [{ type: "text", text }],
+              details: {
+                status: "stream",
+                action,
+                threadId: options.threadId,
+              },
+            });
+          },
+        });
 
-      return {
-        content: [{ type: "text", text: result.output || "Codex prompt completed with no output." }],
-        details: {
-          action,
-          threadId: options.threadId,
-          cwd,
-        },
-      };
+        return {
+          content: [{ type: "text", text: result.output || "Codex prompt completed with no output." }],
+          details: {
+            action,
+            threadId: options.threadId,
+            cwd,
+          },
+        };
+      } catch (err) {
+        const errorText = String(err);
+        return {
+          content: [{ type: "text", text: `Codex continue failed.\n${errorText}` }],
+          details: {
+            action,
+            status: "error",
+            threadId: options.threadId,
+            cwd,
+            error: errorText,
+          },
+        };
+      }
     },
   };
 }

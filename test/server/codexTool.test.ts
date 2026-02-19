@@ -61,4 +61,50 @@ describe("codexTool", () => {
     expect(updates).toEqual(["chunk-a", "chunk-b"]);
     expect(String((result.content[0] as any)?.text || "")).toContain("final output");
   });
+
+  it("returns a non-throwing failure message when codex start fails", async () => {
+    const store = {
+      start: vi.fn(() => ({
+        started: false,
+        running: false,
+        threadId: "t1",
+        cwd: "/tmp/missing",
+        error: "spawn failed",
+      })),
+      status: vi.fn(),
+      stop: vi.fn(),
+      continue: vi.fn(),
+    };
+
+    const tool = createCodexTool({
+      defaultCwd: "/tmp/missing",
+      threadId: "t1",
+      sessionStore: store as any,
+    });
+
+    const start = await tool.execute("c4", { action: "start" } as any);
+    expect(String((start.content[0] as any)?.text || "")).toContain("Failed to start Codex session");
+    expect(String((start.content[0] as any)?.text || "")).toContain("spawn failed");
+  });
+
+  it("returns failure content instead of throwing when continue fails", async () => {
+    const store = {
+      start: vi.fn(),
+      status: vi.fn(),
+      stop: vi.fn(),
+      continue: vi.fn(async () => {
+        throw new Error("exitCode=127\nRecent output:\ncommand not found");
+      }),
+    };
+
+    const tool = createCodexTool({
+      defaultCwd: "/tmp/demo",
+      threadId: "t2",
+      sessionStore: store as any,
+    });
+
+    const result = await tool.execute("c5", { action: "continue", prompt: "run codex" } as any);
+    expect(String((result.content[0] as any)?.text || "")).toContain("Codex continue failed");
+    expect(String((result.content[0] as any)?.text || "")).toContain("exitCode=127");
+  });
 });
