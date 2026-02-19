@@ -73,12 +73,14 @@ async function executeCodexAction(input: CodexRouteExecuteInput): Promise<CodexR
     prompt: input.prompt ?? null,
     promptChars: (input.prompt ?? "").length,
     codexWorkdir: input.toolConfig.codexWorkdir,
+    codexBridgeUrl: input.toolConfig.codexBridgeUrl,
   });
 
   const codexTool = createCodexTool({
     defaultCwd: input.toolConfig.codexWorkdir,
     threadId: input.sessionId,
     sessionStore: getCodexSessionStore(),
+    bridgeUrl: input.toolConfig.codexBridgeUrl,
   });
 
   const result = await codexTool.execute(

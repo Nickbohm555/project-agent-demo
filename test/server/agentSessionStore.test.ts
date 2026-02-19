@@ -17,6 +17,7 @@ const toolConfig = {
   cliAllowedPrefixes: [],
   codexToolEnabled: false,
   codexWorkdir: process.cwd(),
+  codexBridgeUrl: null,
 } as const;
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({

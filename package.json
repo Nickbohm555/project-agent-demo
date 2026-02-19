@@ -10,12 +10,14 @@
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,green \"pnpm dev:server\" \"pnpm dev:web\"",
     "dev:server": "tsx watch server/index.ts",
+    "dev:codex-bridge": "tsx watch server/codexBridgeServer.ts",
     "dev:web": "vite",
     "build": "pnpm build:web && pnpm build:server",
     "build:web": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "start": "node dist/server/index.js",
+    "start:codex-bridge": "node dist/server/server/codexBridgeServer.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

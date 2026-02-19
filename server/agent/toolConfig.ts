@@ -32,6 +32,7 @@ export type AgentToolConfig = {
   cliAllowedPrefixes: string[];
   codexToolEnabled: boolean;
   codexWorkdir: string;
+  codexBridgeUrl: string | null;
 };
 
 export type ResolvedAgentTools = {
@@ -64,6 +65,7 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
   const codexWorkdir = process.env.PI_CODEX_WORKDIR?.trim() || cwd;
   const cliTimeoutSeconds = Math.max(1, Number(process.env.PI_CLI_TIMEOUT_SECONDS ?? 45));
   const rawCodexEnabled = process.env.PI_ENABLE_CODEX_TOOL;
+  const codexBridgeUrl = process.env.PI_CODEX_BRIDGE_URL?.trim() || null;
   const codexToolEnabled = rawCodexEnabled == null || rawCodexEnabled.trim() === ""
     ? true
     : envFlag("PI_ENABLE_CODEX_TOOL");
@@ -77,6 +79,7 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
     cliAllowedPrefixes,
     codexToolEnabled,
     codexWorkdir,
+    codexBridgeUrl,
   };
 }
 
@@ -148,6 +151,7 @@ export function buildAgentTools(
         defaultCwd: config.codexWorkdir,
         threadId: context.threadId,
         sessionStore: codexSessionStore,
+        bridgeUrl: config.codexBridgeUrl,
       }),
     );
   }

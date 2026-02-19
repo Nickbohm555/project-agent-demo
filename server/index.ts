@@ -64,7 +64,7 @@ app.listen(port, () => {
     `[project-agent-demo] server listening on http://localhost:${port} (runtime=${runtime.name}, dotenv=${envResult.loaded ? "loaded" : "missing"})`,
   );
   console.log(
-    `[project-agent-demo] tools configured: ${configuredTools.length > 0 ? configuredTools.join(", ") : "none"} | cliWorkdir=${toolConfig.cliWorkdir} codexWorkdir=${toolConfig.codexWorkdir}`,
+    `[project-agent-demo] tools configured: ${configuredTools.length > 0 ? configuredTools.join(", ") : "none"} | cliWorkdir=${toolConfig.cliWorkdir} codexWorkdir=${toolConfig.codexWorkdir} codexBridgeUrl=${toolConfig.codexBridgeUrl ?? "none"}`,
   );
   console.log(`[project-agent-demo] logging flags: ${JSON.stringify(loggingFlags)}`);
 });

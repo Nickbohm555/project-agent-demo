@@ -107,4 +107,51 @@ describe("codexTool", () => {
     expect(String((result.content[0] as any)?.text || "")).toContain("Codex continue failed");
     expect(String((result.content[0] as any)?.text || "")).toContain("exitCode=127");
   });
+
+  it("proxies execution through codex bridge when configured", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        text: "bridge final",
+        streamText: "bridge stream",
+        details: { running: true, bridged: true },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock as any);
+
+    const store = {
+      start: vi.fn(),
+      status: vi.fn(),
+      stop: vi.fn(),
+      continue: vi.fn(),
+    };
+
+    const updates: string[] = [];
+    const tool = createCodexTool({
+      defaultCwd: "/Users/nickbohm/Desktop/Projects",
+      threadId: "thread-bridge",
+      sessionStore: store as any,
+      bridgeUrl: "http://127.0.0.1:43319",
+    });
+
+    const result = await tool.execute(
+      "c6",
+      { action: "continue", prompt: "check bridge" } as any,
+      undefined,
+      (partial) => {
+        const text = (partial.content[0] as any)?.text;
+        if (typeof text === "string") {
+          updates.push(text);
+        }
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(store.continue).not.toHaveBeenCalled();
+    expect(updates).toEqual(["bridge stream"]);
+    expect(String((result.content[0] as any)?.text || "")).toContain("bridge final");
+    vi.unstubAllGlobals();
+  });
 });

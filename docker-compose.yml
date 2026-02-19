@@ -10,6 +10,8 @@ services:
       PAD_WEB_PORT: ${PAD_WEB_PORT:-43218}
       PAD_WEB_HOST: ${PAD_WEB_HOST:-0.0.0.0}
       PI_ENABLE_CODEX_TOOL: ${PI_ENABLE_CODEX_TOOL:-true}
+      PI_CODEX_WORKDIR: ${PI_CODEX_WORKDIR:-/Users/nickbohm/Desktop/Projects}
+      PI_CODEX_BRIDGE_URL: ${PI_CODEX_BRIDGE_URL:-http://host.docker.internal:43319}
       PI_LOG_TOOL_EVENTS: ${PI_LOG_TOOL_EVENTS:-true}
       PI_LOG_ASSISTANT_DELTAS: ${PI_LOG_ASSISTANT_DELTAS:-false}
       PI_LOG_EVENTS: ${PI_LOG_EVENTS:-false}
@@ -20,7 +22,11 @@ services:
       - "43218:43218"
     volumes:
       - .:/app
+      - /Users/nickbohm/Desktop/Projects:/Users/nickbohm/Desktop/Projects
+      - /Users/nickbohm/.codex:/root/.codex
       - project_agent_demo_node_modules:/app/node_modules
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: pnpm dev
 
 volumes:

@@ -47,6 +47,7 @@ export type AgentRuntimeInfo = {
   toolConfig?: {
     cliToolEnabled?: boolean;
     codexToolEnabled?: boolean;
+    codexBridgeUrl?: string | null;
   };
   loggingFlags?: Record<string, string>;
 };

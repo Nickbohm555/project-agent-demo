@@ -51,6 +51,7 @@ describe("codexRouter", () => {
             cliAllowedPrefixes: [],
             codexToolEnabled: true,
             codexWorkdir: "/tmp",
+            codexBridgeUrl: null,
           }),
         );
         return app;
@@ -81,6 +82,7 @@ describe("codexRouter", () => {
             cliAllowedPrefixes: [],
             codexToolEnabled: false,
             codexWorkdir: "/tmp",
+            codexBridgeUrl: null,
           }),
         );
         return app;
@@ -127,6 +129,7 @@ describe("codexRouter", () => {
               cliAllowedPrefixes: [],
               codexToolEnabled: true,
               codexWorkdir: "/tmp",
+              codexBridgeUrl: null,
             },
             { execute },
           ),

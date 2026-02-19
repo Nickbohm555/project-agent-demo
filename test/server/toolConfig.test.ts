@@ -14,6 +14,7 @@ describe("resolveAgentToolConfig", () => {
     expect(cfg.codexToolEnabled).toBe(true);
     expect(cfg.cliWorkdir).toBe("/tmp/demo");
     expect(cfg.codexWorkdir).toBe("/tmp/demo");
+    expect(cfg.codexBridgeUrl).toBeNull();
     expect(cfg.cliAllowedPrefixes).toEqual([]);
 
     vi.unstubAllEnvs();
@@ -26,6 +27,7 @@ describe("resolveAgentToolConfig", () => {
     vi.stubEnv("PI_CLI_ALLOWED_PREFIXES", "pwd, ls, npm run");
     vi.stubEnv("PI_ENABLE_CODEX_TOOL", "false");
     vi.stubEnv("PI_CODEX_WORKDIR", "/tmp/codex");
+    vi.stubEnv("PI_CODEX_BRIDGE_URL", "http://127.0.0.1:43319");
 
     const cfg = resolveAgentToolConfig("/tmp/demo");
 
@@ -35,6 +37,7 @@ describe("resolveAgentToolConfig", () => {
     expect(cfg.cliAllowedPrefixes).toEqual(["pwd", "ls", "npm run"]);
     expect(cfg.codexToolEnabled).toBe(false);
     expect(cfg.codexWorkdir).toBe("/tmp/codex");
+    expect(cfg.codexBridgeUrl).toBe("http://127.0.0.1:43319");
 
     vi.unstubAllEnvs();
   });
@@ -48,6 +51,7 @@ describe("resolveAgentToolConfig", () => {
         cliAllowedPrefixes: [],
         codexToolEnabled: true,
         codexWorkdir: "/tmp/demo",
+        codexBridgeUrl: null,
       }),
     ).toEqual(["codex"]);
 
@@ -59,6 +63,7 @@ describe("resolveAgentToolConfig", () => {
         cliAllowedPrefixes: [],
         codexToolEnabled: true,
         codexWorkdir: "/tmp/demo",
+        codexBridgeUrl: null,
       }),
     ).toEqual(["codex", "bash"]);
   });
@@ -72,6 +77,7 @@ describe("resolveAgentToolConfig", () => {
         cliAllowedPrefixes: [],
         codexToolEnabled: true,
         codexWorkdir: "/tmp/demo",
+        codexBridgeUrl: null,
       }),
     ).toEqual([
       { name: "codex", kind: "custom", enabled: true },

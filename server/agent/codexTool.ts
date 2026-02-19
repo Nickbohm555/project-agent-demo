@@ -21,6 +21,13 @@ type CodexToolInput = {
   prompt?: string;
 };
 
+type CodexBridgeResponse = {
+  ok: boolean;
+  text: string;
+  streamText?: string;
+  details?: Record<string, unknown> | null;
+};
+
 function stripAnsiAndControl(text: string): string {
   // Remove ANSI escape/control sequences commonly emitted by PTY sessions.
   const ansiStripped = text.replace(
@@ -104,10 +111,47 @@ function codexLog(level: "info" | "warn" | "error", event: string, details: Reco
   console.log(line);
 }
 
+function normalizeBridgeUrl(url: string): string {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+async function executeBridgeAction(input: {
+  bridgeUrl: string;
+  threadId: string;
+  action: "start" | "continue" | "stop" | "status";
+  prompt?: string;
+  signal?: AbortSignal;
+}): Promise<CodexBridgeResponse> {
+  const timeoutMs = envPositiveInt("PI_CODEX_BRIDGE_TIMEOUT_MS", 30_000);
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const requestSignal = input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal;
+  const endpoint = `${normalizeBridgeUrl(input.bridgeUrl)}/execute`;
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: input.threadId,
+      action: input.action,
+      prompt: input.prompt,
+    }),
+    signal: requestSignal,
+  });
+  const payload = (await res.json()) as CodexBridgeResponse & {
+    error?: string;
+    details?: unknown;
+  };
+  if (!res.ok || payload.ok === false) {
+    const detail = payload.error ? `${payload.error}${payload.details ? `: ${String(payload.details)}` : ""}` : JSON.stringify(payload);
+    throw new Error(`Codex bridge request failed (${res.status}): ${detail}`);
+  }
+  return payload;
+}
+
 export function createCodexTool(options: {
   defaultCwd: string;
   threadId: string;
   sessionStore: CodexSessionStore;
+  bridgeUrl?: string | null;
 }): ToolDefinition<typeof codexToolSchema> {
   return {
     name: "codex",
@@ -124,9 +168,71 @@ export function createCodexTool(options: {
         threadId: options.threadId,
         action,
         cwd,
+        bridgeUrl: options.bridgeUrl ?? null,
         prompt: params.prompt ?? null,
         promptChars: (params.prompt ?? "").trim().length,
       });
+
+      if (options.bridgeUrl) {
+        try {
+          const bridgeResult = await executeBridgeAction({
+            bridgeUrl: options.bridgeUrl,
+            threadId: options.threadId,
+            action,
+            prompt: params.prompt,
+            signal,
+          });
+          const streamText = (bridgeResult.streamText ?? "").trim();
+          const text = (bridgeResult.text ?? "").trim();
+          if (streamText) {
+            onUpdate?.({
+              content: [{ type: "text" as const, text: streamText }],
+              details: {
+                status: "stream",
+                action,
+                threadId: options.threadId,
+              },
+            });
+          }
+          const responseText = text || streamText || "Codex prompt completed with no output.";
+          codexLog("info", "execute.bridge.result", {
+            toolCallId,
+            threadId: options.threadId,
+            action,
+            elapsedMs: Date.now() - startedAtMs,
+            textChars: responseText.length,
+          });
+          return {
+            content: [{ type: "text" as const, text: responseText }],
+            details: (bridgeResult.details as Record<string, unknown> | undefined) ?? {
+              action,
+              threadId: options.threadId,
+              cwd,
+              bridged: true,
+            },
+          };
+        } catch (err) {
+          const errorText = String(err);
+          codexLog("error", "execute.bridge.error", {
+            toolCallId,
+            threadId: options.threadId,
+            action,
+            elapsedMs: Date.now() - startedAtMs,
+            error: errorText,
+          });
+          return {
+            content: [{ type: "text" as const, text: `Codex ${action} failed.\n${errorText}` }],
+            details: {
+              action,
+              status: "error",
+              threadId: options.threadId,
+              cwd,
+              bridgeUrl: options.bridgeUrl,
+              error: errorText,
+            },
+          };
+        }
+      }
 
       if (action === "start") {
         const status = options.sessionStore.start(options.threadId, cwd);
