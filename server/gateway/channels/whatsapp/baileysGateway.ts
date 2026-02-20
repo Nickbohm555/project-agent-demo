@@ -223,8 +223,20 @@ export class WhatsAppBaileysGateway {
   private async handleMessagesUpsert(upsert: unknown): Promise<void> {
     const payload = upsert as { messages?: Array<unknown> };
     const messages = payload.messages ?? [];
+    console.log(
+      `[gateway/whatsapp] upsert received messages=${messages.length} selfChatMode=${this.options.selfChatMode}`,
+    );
 
     for (const rawMessage of messages) {
+      const debug = rawMessage as {
+        key?: { fromMe?: boolean; remoteJid?: string };
+        message?: { conversation?: string; extendedTextMessage?: { text?: string } };
+      };
+      console.log(
+        `[gateway/whatsapp] message fromMe=${Boolean(debug.key?.fromMe)} remoteJid=${debug.key?.remoteJid ?? "unknown"} hasText=${Boolean(
+          debug.message?.conversation || debug.message?.extendedTextMessage?.text,
+        )}`,
+      );
       const inbound = mapBaileysInbound(rawMessage as never, {
         selfChatMode: this.options.selfChatMode,
       });
