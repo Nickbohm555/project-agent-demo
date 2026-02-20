@@ -62,10 +62,10 @@ Inbound Provider Event
 
 4. Runtime layer (`server/agent/*`)
 - `MockAgentRuntime`: deterministic local behavior
-- `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with optional CLI `bash` tool
+- `EmbeddedPiRuntime`: actual `createAgentSession` scaffold with optional `codex` tool
 - `AgentSessionStore`: keeps one in-memory PI session per `agentId+sessionId`
 - `modelConfig`: resolves provider/model/thinking + required API key env readiness
-- `toolConfig`: toggles CLI `bash` tool and optional command prefix allowlist
+- `toolConfig`: toggles the `codex` tool and optional bridge URL
 - `codexTool`: controls long-lived Codex sessions (`start`, `continue`, `status`, `stop`)
 
 ## OpenClaw concept mapping

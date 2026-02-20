@@ -46,10 +46,6 @@ describe("codexRouter", () => {
         app.use(
           "/api/codex",
           buildCodexRouter({
-            cliToolEnabled: true,
-            cliWorkdir: "/tmp",
-            cliTimeoutSeconds: 45,
-            cliAllowedPrefixes: [],
             codexToolEnabled: true,
             codexWorkdir: "/tmp",
             codexBridgeUrl: null,
@@ -77,10 +73,6 @@ describe("codexRouter", () => {
         app.use(
           "/api/codex",
           buildCodexRouter({
-            cliToolEnabled: true,
-            cliWorkdir: "/tmp",
-            cliTimeoutSeconds: 45,
-            cliAllowedPrefixes: [],
             codexToolEnabled: false,
             codexWorkdir: "/tmp",
             codexBridgeUrl: null,
@@ -124,10 +116,6 @@ describe("codexRouter", () => {
           "/api/codex",
           buildCodexRouter(
             {
-              cliToolEnabled: true,
-              cliWorkdir: "/tmp",
-              cliTimeoutSeconds: 45,
-              cliAllowedPrefixes: [],
               codexToolEnabled: true,
               codexWorkdir: "/tmp",
               codexBridgeUrl: null,
@@ -170,10 +158,6 @@ describe("codexRouter", () => {
           "/api/codex",
           buildCodexRouter(
             {
-              cliToolEnabled: true,
-              cliWorkdir: "/tmp",
-              cliTimeoutSeconds: 45,
-              cliAllowedPrefixes: [],
               codexToolEnabled: true,
               codexWorkdir: "/tmp",
               codexBridgeUrl: null,

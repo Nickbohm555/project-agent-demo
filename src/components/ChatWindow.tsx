@@ -70,9 +70,6 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         if (runtime.toolConfig?.codexToolEnabled) {
           fallbackCatalog.push({ name: "codex", kind: "custom", enabled: true });
         }
-        if (runtime.toolConfig?.cliToolEnabled) {
-          fallbackCatalog.push({ name: "bash", kind: "built-in", enabled: true });
-        }
         setToolCatalog(fallbackCatalog);
       })
       .catch(() => {

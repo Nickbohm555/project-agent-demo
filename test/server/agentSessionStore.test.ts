@@ -15,10 +15,6 @@ const modelConfig = {
   hasRequiredApiKey: true,
 } as const;
 const toolConfig = {
-  cliToolEnabled: false,
-  cliWorkdir: process.cwd(),
-  cliTimeoutSeconds: 45,
-  cliAllowedPrefixes: [],
   codexToolEnabled: false,
   codexWorkdir: process.cwd(),
   codexBridgeUrl: null,

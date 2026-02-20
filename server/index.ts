@@ -62,7 +62,6 @@ app.get("/api/health", (_req, res) => {
     model: `${modelConfig.provider}/${modelConfig.modelId}`,
     thinkingLevel: modelConfig.thinkingLevel,
     hasRequiredApiKey: modelConfig.hasRequiredApiKey,
-    cliToolEnabled: toolConfig.cliToolEnabled,
     codexToolEnabled: toolConfig.codexToolEnabled,
     whatsappGateway: {
       enabled: gatewayConfig.whatsapp.enabled,
@@ -104,7 +103,7 @@ app.listen(port, () => {
     `[project-agent-demo] server listening on http://localhost:${port} (runtime=${runtime.name}, dotenv=${envResult.loaded ? "loaded" : "missing"})`,
   );
   console.log(
-    `[project-agent-demo] tools configured: ${configuredTools.length > 0 ? configuredTools.join(", ") : "none"} | cliWorkdir=${toolConfig.cliWorkdir} codexWorkdir=${toolConfig.codexWorkdir} codexBridgeUrl=${toolConfig.codexBridgeUrl ?? "none"}`,
+    `[project-agent-demo] tools configured: ${configuredTools.length > 0 ? configuredTools.join(", ") : "none"} | codexWorkdir=${toolConfig.codexWorkdir} codexBridgeUrl=${toolConfig.codexBridgeUrl ?? "none"}`,
   );
   console.log(
     `[project-agent-demo] whatsapp gateway: enabled=${gatewayConfig.whatsapp.enabled} provider=${gatewayConfig.whatsapp.provider} authDir=${gatewayConfig.whatsapp.authDir}`,

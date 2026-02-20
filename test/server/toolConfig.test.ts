@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildShellArgs,
   getConfiguredToolNames,
   getToolCatalog,
   resolveAgentToolConfig,
@@ -8,28 +7,19 @@ import {
 
 describe("resolveAgentToolConfig", () => {
   it("defaults with codex tool enabled and cli tool disabled", () => {
-    vi.stubEnv("PI_ENABLE_CLI_TOOL", "");
-    vi.stubEnv("PI_CLI_ALLOWED_PREFIXES", "");
     vi.stubEnv("PI_ENABLE_CODEX_TOOL", "");
     vi.stubEnv("PI_CODEX_WORKDIR", "");
 
     const cfg = resolveAgentToolConfig("/tmp/demo");
 
-    expect(cfg.cliToolEnabled).toBe(false);
     expect(cfg.codexToolEnabled).toBe(true);
-    expect(cfg.cliWorkdir).toBe("/tmp/demo");
     expect(cfg.codexWorkdir).toBe("/tmp/demo");
     expect(cfg.codexBridgeUrl).toBeNull();
-    expect(cfg.cliAllowedPrefixes).toEqual([]);
 
     vi.unstubAllEnvs();
   });
 
-  it("parses cli and codex settings from env", () => {
-    vi.stubEnv("PI_ENABLE_CLI_TOOL", "true");
-    vi.stubEnv("PI_CLI_WORKDIR", "/tmp/work");
-    vi.stubEnv("PI_CLI_TIMEOUT_SECONDS", "30");
-    vi.stubEnv("PI_CLI_ALLOWED_PREFIXES", "pwd, ls, npm run");
+  it("parses codex settings from env", () => {
     vi.stubEnv("PI_ENABLE_CODEX_TOOL", "false");
     vi.stubEnv("PI_ENABLE_CODEX_BRIDGE", "true");
     vi.stubEnv("PI_CODEX_WORKDIR", "/tmp/codex");
@@ -37,10 +27,6 @@ describe("resolveAgentToolConfig", () => {
 
     const cfg = resolveAgentToolConfig("/tmp/demo");
 
-    expect(cfg.cliToolEnabled).toBe(true);
-    expect(cfg.cliWorkdir).toBe("/tmp/work");
-    expect(cfg.cliTimeoutSeconds).toBe(30);
-    expect(cfg.cliAllowedPrefixes).toEqual(["pwd", "ls", "npm run"]);
     expect(cfg.codexToolEnabled).toBe(false);
     expect(cfg.codexWorkdir).toBe("/tmp/codex");
     expect(cfg.codexBridgeUrl).toBe("http://127.0.0.1:43319");
@@ -51,54 +37,22 @@ describe("resolveAgentToolConfig", () => {
   it("lists configured tools in deterministic order", () => {
     expect(
       getConfiguredToolNames({
-        cliToolEnabled: false,
-        cliWorkdir: "/tmp/demo",
-        cliTimeoutSeconds: 45,
-        cliAllowedPrefixes: [],
         codexToolEnabled: true,
         codexWorkdir: "/tmp/demo",
         codexBridgeUrl: null,
       }),
     ).toEqual(["codex"]);
-
-    expect(
-      getConfiguredToolNames({
-        cliToolEnabled: true,
-        cliWorkdir: "/tmp/demo",
-        cliTimeoutSeconds: 45,
-        cliAllowedPrefixes: [],
-        codexToolEnabled: true,
-        codexWorkdir: "/tmp/demo",
-        codexBridgeUrl: null,
-      }),
-    ).toEqual(["codex", "bash"]);
   });
 
   it("returns complete tool catalog with enabled flags", () => {
     expect(
       getToolCatalog({
-        cliToolEnabled: false,
-        cliWorkdir: "/tmp/demo",
-        cliTimeoutSeconds: 45,
-        cliAllowedPrefixes: [],
         codexToolEnabled: true,
         codexWorkdir: "/tmp/demo",
         codexBridgeUrl: null,
       }),
     ).toEqual([
       { name: "codex", kind: "custom", enabled: true },
-      { name: "bash", kind: "built-in", enabled: false },
     ]);
-  });
-});
-
-describe("buildShellArgs", () => {
-  it("uses login + interactive for zsh so PATH from zshrc is loaded", () => {
-    expect(buildShellArgs("/bin/zsh", "git status")).toEqual(["-lic", "git status"]);
-  });
-
-  it("uses login shell for non-zsh shells", () => {
-    expect(buildShellArgs("/bin/bash", "git status")).toEqual(["-lc", "git status"]);
-    expect(buildShellArgs("bash", "git status")).toEqual(["-lc", "git status"]);
   });
 });

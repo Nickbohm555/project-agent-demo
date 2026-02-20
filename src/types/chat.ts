@@ -45,7 +45,6 @@ export type AgentRuntimeInfo = {
     enabled: boolean;
   }>;
   toolConfig?: {
-    cliToolEnabled?: boolean;
     codexToolEnabled?: boolean;
     codexBridgeUrl?: string | null;
   };
