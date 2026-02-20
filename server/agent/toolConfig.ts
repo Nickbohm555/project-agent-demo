@@ -65,7 +65,8 @@ export function resolveAgentToolConfig(cwd: string = process.cwd()): AgentToolCo
   const codexWorkdir = process.env.PI_CODEX_WORKDIR?.trim() || cwd;
   const cliTimeoutSeconds = Math.max(1, Number(process.env.PI_CLI_TIMEOUT_SECONDS ?? 45));
   const rawCodexEnabled = process.env.PI_ENABLE_CODEX_TOOL;
-  const codexBridgeUrl = process.env.PI_CODEX_BRIDGE_URL?.trim() || null;
+  const codexBridgeEnabled = envFlag("PI_ENABLE_CODEX_BRIDGE");
+  const codexBridgeUrl = codexBridgeEnabled ? process.env.PI_CODEX_BRIDGE_URL?.trim() || null : null;
   const codexToolEnabled = rawCodexEnabled == null || rawCodexEnabled.trim() === ""
     ? true
     : envFlag("PI_ENABLE_CODEX_TOOL");
@@ -96,6 +97,14 @@ function assertCommandAllowed(command: string, allowedPrefixes: string[]) {
   }
 }
 
+export function buildShellArgs(shell: string, command: string): string[] {
+  const shellName = shell.split("/").pop()?.toLowerCase() ?? shell.toLowerCase();
+  if (shellName === "zsh") {
+    return ["-lic", command];
+  }
+  return ["-lc", command];
+}
+
 function runShellCommand(command: string, cwd: string, options: {
   onData: (data: Buffer) => void;
   signal?: AbortSignal;
@@ -104,7 +113,7 @@ function runShellCommand(command: string, cwd: string, options: {
 }): Promise<{ exitCode: number | null }> {
   return new Promise((resolve, reject) => {
     const shell = process.env.SHELL || "bash";
-    const child = spawn(shell, ["-lc", command], {
+    const child = spawn(shell, buildShellArgs(shell, command), {
       cwd,
       env: {
         ...process.env,

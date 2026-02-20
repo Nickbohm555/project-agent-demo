@@ -1,4 +1,4 @@
-import { createAgentSession, SessionManager, type AgentSession } from "@mariozechner/pi-coding-agent";
+import { AuthStorage, createAgentSession, SessionManager, type AgentSession } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
 import type { AgentModelConfig } from "./modelConfig.js";
 import { buildAgentTools, type AgentToolConfig } from "./toolConfig.js";
@@ -17,11 +17,18 @@ function sessionKey(agentId: string, sessionId: string) {
 
 export class AgentSessionStore {
   private records = new Map<string, SessionRecord>();
+  private authStorage: AuthStorage;
 
   constructor(
     private modelConfig: AgentModelConfig,
     private toolConfig: AgentToolConfig,
-  ) {}
+  ) {
+    this.authStorage = new AuthStorage();
+    const apiKey = resolveApiKeyFromEnv(modelConfig.requiredApiKeyEnv);
+    if (apiKey) {
+      this.authStorage.setRuntimeApiKey(modelConfig.provider, apiKey);
+    }
+  }
 
   async getOrCreate(agentId: string, sessionId: string): Promise<SessionRecord> {
     const key = sessionKey(agentId, sessionId);
@@ -39,6 +46,7 @@ export class AgentSessionStore {
       thinkingLevel: this.modelConfig.thinkingLevel,
       tools: tools.builtInTools,
       customTools: tools.customTools,
+      authStorage: this.authStorage,
       sessionManager: SessionManager.inMemory(process.cwd()),
       cwd: process.cwd(),
     });
@@ -73,4 +81,14 @@ export class AgentSessionStore {
       thinkingLevel: this.modelConfig.thinkingLevel,
     }));
   }
+}
+
+function resolveApiKeyFromEnv(envNames: readonly string[]): string | undefined {
+  for (const name of envNames) {
+    const value = process.env[name];
+    if (value && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
 }

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 
 type StreamChunkHandler = (text: string) => void;
 
@@ -80,6 +81,67 @@ function envFlag(name: string, defaultValue: boolean): boolean {
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
+function maskToken(token: string): string {
+  const trimmed = token.trim();
+  if (trimmed.length <= 12) {
+    return "***";
+  }
+  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
+}
+
+function formatEnvValue(value: string | undefined): string {
+  if (!value || !value.trim()) {
+    return "missing";
+  }
+  return maskToken(value);
+}
+
+function logCodexEnv(threadId: string) {
+  if (!envFlag("PI_LOG_CODEX_ENV", false)) {
+    return;
+  }
+  const apiKey = formatEnvValue(process.env.OPENAI_API_KEY);
+  const baseUrl = process.env.OPENAI_BASE_URL?.trim() || process.env.OPENAI_API_BASE?.trim() || "default";
+  console.log(`[codex-env] thread=${threadId} OPENAI_API_KEY=${apiKey} OPENAI_BASE_URL=${baseUrl}`);
+
+  if (envFlag("PI_LOG_CODEX_ENV_VERBOSE", false)) {
+    const path = process.env.PATH?.trim() || "missing";
+    const gitHint = buildGitHint(
+      ["/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"],
+      existsSync,
+    );
+    console.log(`[codex-env] thread=${threadId} SHELL=${process.env.SHELL || "missing"} PATH=${path} GIT_HINT=${gitHint}`);
+  }
+}
+
+function buildGitHint(candidates: string[], exists: (path: string) => boolean): string {
+  const hits = candidates.filter((candidate) => exists(candidate));
+  return hits.length > 0 ? hits.join(",") : "none";
+}
+
+function ensurePath(env: NodeJS.ProcessEnv): string {
+  const required = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+  const current = env.PATH ?? "";
+  const parts = current.split(":").filter(Boolean);
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const entry of [...required, ...parts]) {
+    if (seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    merged.push(entry);
+  }
+  return merged.join(":");
+}
+
+function buildCodexEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    PATH: ensurePath(env),
+  };
+}
+
 function trimTail(text: string, extra: string): string {
   return `${text}${extra}`.slice(-MAX_OUTPUT_TAIL);
 }
@@ -87,6 +149,7 @@ function trimTail(text: string, extra: string): string {
 type CodexJsonEvent = {
   type?: string;
   thread_id?: string;
+  message?: string;
   item?: {
     type?: string;
     text?: string;
@@ -265,9 +328,10 @@ export class CodexSessionStore {
       : ["exec", ...baseArgs, prompt];
 
     return new Promise<ContinueResult>((resolve, reject) => {
+      logCodexEnv(record.threadId);
       const child: ChildProcess = spawn("codex", args, {
         cwd: record.cwd,
-        env: process.env,
+        env: buildCodexEnv(process.env),
         stdio: ["ignore", "pipe", "pipe"],
       });
 
@@ -312,6 +376,11 @@ export class CodexSessionStore {
       const onJsonEvent = (event: CodexJsonEvent) => {
         if (event.type === "thread.started" && typeof event.thread_id === "string" && event.thread_id) {
           record.codexThreadId = event.thread_id;
+          return;
+        }
+
+        if (event.type === "error" && typeof event.message === "string") {
+          pushDiagnostic(`codex error: ${event.message}`);
           return;
         }
 
@@ -470,3 +539,11 @@ export class CodexSessionStore {
     });
   }
 }
+
+export const __testing__ = {
+  buildGitHint,
+  buildCodexEnv,
+  ensurePath,
+  formatEnvValue,
+  maskToken,
+};

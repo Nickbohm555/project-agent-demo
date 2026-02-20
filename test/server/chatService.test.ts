@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ChatService } from "../../server/chat/chatService.js";
 import { ChatEventBus } from "../../server/chat/chatEvents.js";
 import type { AgentRuntime } from "../../server/agent/types.js";
@@ -53,5 +53,31 @@ describe("ChatService", () => {
     expect(result.session.messages.at(-1)?.role).toBe("assistant");
     expect(result.session.messages.at(-1)?.text).toContain("Agent run failed.");
     expect(result.session.messages.at(-1)?.text).toContain("runtime exploded");
+  });
+
+  it("returns a clear failure when required API keys are missing", async () => {
+    const runtime = {
+      name: "test-runtime",
+      run: vi.fn(async () => ({
+        runId: "run-ignored",
+        status: "completed" as const,
+        assistantText: "should not run",
+      })),
+    } satisfies AgentRuntime;
+
+    const service = new ChatService(runtime, new ChatEventBus(), {
+      provider: "openai",
+      modelId: "gpt-4.1-mini",
+      thinkingLevel: "off",
+      requiredApiKeyEnv: ["OPENAI_API_KEY"],
+      hasRequiredApiKey: false,
+    });
+
+    const result = await service.sendMessage("agent-a", "s4", "hello");
+
+    expect(runtime.run).not.toHaveBeenCalled();
+    expect(result.run.status).toBe("failed");
+    expect(result.session.messages.at(-1)?.text).toContain("Missing API key");
+    expect(result.session.messages.at(-1)?.text).toContain("OPENAI_API_KEY");
   });
 });

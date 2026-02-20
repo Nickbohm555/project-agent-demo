@@ -11,7 +11,8 @@ RUN corepack enable
 
 # Native build deps for packages like @lydell/node-pty on Linux.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends git python3 make g++ ca-certificates openssl \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @openai/codex@${CODEX_CLI_VERSION}

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentRuntime, AgentRuntimeResponse } from "../agent/types.js";
+import type { AgentModelConfig } from "../agent/modelConfig.js";
 import type { ChatEventBus } from "./chatEvents.js";
 import type { ChatMessage, ChatSession } from "./chatTypes.js";
 
@@ -9,6 +10,7 @@ export class ChatService {
   constructor(
     private runtime: AgentRuntime,
     private events: ChatEventBus,
+    private modelConfig?: AgentModelConfig,
   ) {}
 
   getSession(sessionId: string): ChatSession {
@@ -58,6 +60,30 @@ export class ChatService {
     );
 
     let run: AgentRuntimeResponse;
+    if (this.modelConfig && !this.modelConfig.hasRequiredApiKey) {
+      const requiredKeys = this.modelConfig.requiredApiKeyEnv.join(", ");
+      const errorText = requiredKeys
+        ? `Missing API key for provider "${this.modelConfig.provider}". Set ${requiredKeys} in the environment and restart the server.`
+        : `Missing API key for provider "${this.modelConfig.provider}".`;
+      this.events.publish({
+        sessionId,
+        runId,
+        type: "lifecycle",
+        phase: "error",
+        text: errorText,
+        timestamp: new Date().toISOString(),
+      });
+      run = {
+        runId,
+        status: "failed",
+        assistantText: "Agent run failed due to missing API key.",
+        diagnostics: {
+          adapter: this.runtime.name,
+          agentId,
+          error: errorText,
+        },
+      };
+    } else {
     try {
       run = await this.runtime.run({
         runId,
@@ -94,6 +120,7 @@ export class ChatService {
           error: errorText,
         },
       };
+    }
     }
 
     const assistantMessage: ChatMessage = {

@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolveProxyApiPort, resolveWebHost, resolveWebPort } from "./config/ports";
+import { resolveProxyApiHost, resolveProxyApiPort, resolveWebHost, resolveWebPort } from "./config/ports";
 
 const webPort = resolveWebPort();
 const apiPort = resolveProxyApiPort();
+const apiHost = resolveProxyApiHost();
 const webHost = resolveWebHost();
 
 export default defineConfig({
@@ -13,7 +14,7 @@ export default defineConfig({
     port: webPort,
     proxy: {
       "/api": {
-        target: `http://localhost:${apiPort}`,
+        target: `http://${apiHost}:${apiPort}`,
         changeOrigin: true,
       },
     },

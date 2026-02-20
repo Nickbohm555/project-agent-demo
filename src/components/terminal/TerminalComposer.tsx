@@ -22,12 +22,12 @@ export function TerminalComposer({
       <textarea
         value={prompt}
         onChange={(event) => onPromptChange(event.target.value)}
-        placeholder={running ? "Send prompt to Codex session..." : "Start session and send prompt..."}
+        placeholder={running ? "Send prompt to Codex session..." : "Start session first, then send a prompt..."}
         rows={3}
         disabled={busy}
       />
       <button type="submit" disabled={!canSend}>
-        {busy ? "Running..." : running ? "Send" : "Start/Send"}
+        {busy ? "Running..." : "Send"}
       </button>
     </form>
   );

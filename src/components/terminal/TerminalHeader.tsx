@@ -2,6 +2,8 @@ type TerminalHeaderProps = {
   sessionId: string;
   busy: boolean;
   running: boolean;
+  canStart: boolean;
+  onStart: () => void;
   onStatus: () => void;
   onStop: () => void;
   onClear: () => void;
@@ -11,6 +13,8 @@ export function TerminalHeader({
   sessionId,
   busy,
   running,
+  canStart,
+  onStart,
   onStatus,
   onStop,
   onClear,
@@ -22,6 +26,9 @@ export function TerminalHeader({
         <p>Session: {sessionId}</p>
       </div>
       <div className="terminal-actions">
+        <button type="button" onClick={onStart} disabled={!canStart}>
+          Start
+        </button>
         <button type="button" onClick={onStatus} disabled={busy}>
           Status
         </button>

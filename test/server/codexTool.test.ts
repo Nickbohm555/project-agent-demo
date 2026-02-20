@@ -154,4 +154,49 @@ describe("codexTool", () => {
     expect(String((result.content[0] as any)?.text || "")).toContain("bridge final");
     vi.unstubAllGlobals();
   });
+
+  it("falls back to local session when bridge is unreachable", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    });
+    vi.stubGlobal("fetch", fetchMock as any);
+
+    const continueMock = vi.fn(async (_threadId, _cwd, params) => {
+      params.onChunk?.("local-stream");
+      return { output: "local output" };
+    });
+
+    const store = {
+      start: vi.fn(),
+      status: vi.fn(),
+      stop: vi.fn(),
+      continue: continueMock,
+    };
+
+    const updates: string[] = [];
+    const tool = createCodexTool({
+      defaultCwd: "/Users/nickbohm/Desktop/Projects",
+      threadId: "thread-fallback",
+      sessionStore: store as any,
+      bridgeUrl: "http://host.docker.internal:43319",
+    });
+
+    const result = await tool.execute(
+      "c7",
+      { action: "continue", prompt: "check fallback" } as any,
+      undefined,
+      (partial) => {
+        const text = (partial.content[0] as any)?.text;
+        if (typeof text === "string") {
+          updates.push(text);
+        }
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(continueMock).toHaveBeenCalledOnce();
+    expect(updates).toEqual(["local-stream"]);
+    expect(String((result.content[0] as any)?.text || "")).toContain("local output");
+    vi.unstubAllGlobals();
+  });
 });

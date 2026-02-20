@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { resolveApiPort, resolveProxyApiPort, resolveWebHost, resolveWebPort } from "../../config/ports.js";
+import {
+  resolveApiPort,
+  resolveProxyApiHost,
+  resolveProxyApiPort,
+  resolveWebHost,
+  resolveWebPort,
+} from "../../config/ports.js";
 
 describe("port resolution", () => {
   it("uses project defaults in development", () => {
     const env = { NODE_ENV: "development", PORT: "9000" } as NodeJS.ProcessEnv;
     expect(resolveApiPort(env)).toBe(43217);
     expect(resolveProxyApiPort(env)).toBe(43217);
+    expect(resolveProxyApiHost(env)).toBe("127.0.0.1");
     expect(resolveWebPort(env)).toBe(43218);
     expect(resolveWebHost(env)).toBe("127.0.0.1");
   });
@@ -25,6 +32,11 @@ describe("port resolution", () => {
   it("uses explicit PAD web host when provided", () => {
     const env = { PAD_WEB_HOST: "0.0.0.0" } as NodeJS.ProcessEnv;
     expect(resolveWebHost(env)).toBe("0.0.0.0");
+  });
+
+  it("uses explicit PAD api host when provided", () => {
+    const env = { PAD_API_HOST: "host.docker.internal" } as NodeJS.ProcessEnv;
+    expect(resolveProxyApiHost(env)).toBe("host.docker.internal");
   });
 
   it("allows generic PORT fallback only in production server mode", () => {

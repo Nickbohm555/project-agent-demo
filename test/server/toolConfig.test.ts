@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { getConfiguredToolNames, getToolCatalog, resolveAgentToolConfig } from "../../server/agent/toolConfig.js";
+import {
+  buildShellArgs,
+  getConfiguredToolNames,
+  getToolCatalog,
+  resolveAgentToolConfig,
+} from "../../server/agent/toolConfig.js";
 
 describe("resolveAgentToolConfig", () => {
   it("defaults with codex tool enabled and cli tool disabled", () => {
@@ -26,6 +31,7 @@ describe("resolveAgentToolConfig", () => {
     vi.stubEnv("PI_CLI_TIMEOUT_SECONDS", "30");
     vi.stubEnv("PI_CLI_ALLOWED_PREFIXES", "pwd, ls, npm run");
     vi.stubEnv("PI_ENABLE_CODEX_TOOL", "false");
+    vi.stubEnv("PI_ENABLE_CODEX_BRIDGE", "true");
     vi.stubEnv("PI_CODEX_WORKDIR", "/tmp/codex");
     vi.stubEnv("PI_CODEX_BRIDGE_URL", "http://127.0.0.1:43319");
 
@@ -83,5 +89,16 @@ describe("resolveAgentToolConfig", () => {
       { name: "codex", kind: "custom", enabled: true },
       { name: "bash", kind: "built-in", enabled: false },
     ]);
+  });
+});
+
+describe("buildShellArgs", () => {
+  it("uses login + interactive for zsh so PATH from zshrc is loaded", () => {
+    expect(buildShellArgs("/bin/zsh", "git status")).toEqual(["-lic", "git status"]);
+  });
+
+  it("uses login shell for non-zsh shells", () => {
+    expect(buildShellArgs("/bin/bash", "git status")).toEqual(["-lc", "git status"]);
+    expect(buildShellArgs("bash", "git status")).toEqual(["-lc", "git status"]);
   });
 });

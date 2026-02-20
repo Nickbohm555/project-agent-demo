@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createAgentSessionMock = vi.fn();
 const inMemoryMock = vi.fn(() => ({ kind: "memory-session-manager" }));
 const getModelMock = vi.fn(() => ({ provider: "openai", id: "gpt-4.1-mini" }));
+const setRuntimeApiKeyMock = vi.fn();
+class AuthStorageMock {
+  setRuntimeApiKey = setRuntimeApiKeyMock;
+}
 const modelConfig = {
   provider: "openai",
   modelId: "gpt-4.1-mini",
@@ -22,6 +26,7 @@ const toolConfig = {
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession: createAgentSessionMock,
+  AuthStorage: AuthStorageMock,
   SessionManager: {
     inMemory: inMemoryMock,
   },
@@ -36,9 +41,12 @@ describe("AgentSessionStore", () => {
     createAgentSessionMock.mockReset();
     inMemoryMock.mockClear();
     getModelMock.mockClear();
+    setRuntimeApiKeyMock.mockClear();
+    vi.unstubAllEnvs();
   });
 
   it("creates one PI session per agent and reuses it", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test");
     createAgentSessionMock.mockResolvedValue({
       session: {
         sessionId: "pi-session-1",
@@ -57,9 +65,11 @@ describe("AgentSessionStore", () => {
     expect(createAgentSessionMock).toHaveBeenCalledTimes(1);
     expect(getModelMock).toHaveBeenCalledTimes(1);
     expect(inMemoryMock).toHaveBeenCalledTimes(1);
+    expect(setRuntimeApiKeyMock).toHaveBeenCalledWith("openai", "sk-test");
   });
 
   it("creates distinct sessions for different agents", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test");
     createAgentSessionMock
       .mockResolvedValueOnce({
         session: {

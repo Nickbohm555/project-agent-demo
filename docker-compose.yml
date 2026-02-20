@@ -17,6 +17,8 @@ services:
       PI_LOG_EVENTS: ${PI_LOG_EVENTS:-false}
       PI_LOG_RAW_EVENTS: ${PI_LOG_RAW_EVENTS:-false}
       PI_LOG_CODEX_TOOL: ${PI_LOG_CODEX_TOOL:-true}
+      PI_LOG_CODEX_ENV: ${PI_LOG_CODEX_ENV:-true}
+      PI_LOG_CODEX_ENV_VERBOSE: ${PI_LOG_CODEX_ENV_VERBOSE:-true}
     ports:
       - "43217:43217"
       - "43218:43218"
@@ -24,6 +26,8 @@ services:
       - .:/app
       - /Users/nickbohm/Desktop/Projects:/Users/nickbohm/Desktop/Projects
       - /Users/nickbohm/.codex:/root/.codex
+      - /Users/nickbohm/.config/gh:/root/.config/gh:ro
+      - /Users/nickbohm/.gitconfig:/root/.gitconfig:ro
       - project_agent_demo_node_modules:/app/node_modules
     extra_hosts:
       - "host.docker.internal:host-gateway"

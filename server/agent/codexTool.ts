@@ -115,6 +115,20 @@ function normalizeBridgeUrl(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+function isBridgeConnectivityError(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    normalized.includes("fetch failed") ||
+    normalized.includes("econnrefused") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("ehostunreach") ||
+    normalized.includes("socket hang up") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("network")
+  );
+}
+
 async function executeBridgeAction(input: {
   bridgeUrl: string;
   threadId: string;
@@ -163,6 +177,7 @@ export function createCodexTool(options: {
       const startedAtMs = Date.now();
       const action = params.action ?? (params.prompt ? "continue" : "status");
       const cwd = options.defaultCwd;
+      let bridgeFallback = false;
       codexLog("info", "execute.start", {
         toolCallId,
         threadId: options.threadId,
@@ -213,26 +228,46 @@ export function createCodexTool(options: {
           };
         } catch (err) {
           const errorText = String(err);
-          codexLog("error", "execute.bridge.error", {
+          const fallbackEnabled = envFlag("PI_CODEX_BRIDGE_FALLBACK", true);
+          const shouldFallback = fallbackEnabled && isBridgeConnectivityError(errorText);
+          if (!shouldFallback) {
+            codexLog("error", "execute.bridge.error", {
+              toolCallId,
+              threadId: options.threadId,
+              action,
+              elapsedMs: Date.now() - startedAtMs,
+              error: errorText,
+            });
+            return {
+              content: [{ type: "text" as const, text: `Codex ${action} failed.\n${errorText}` }],
+              details: {
+                action,
+                status: "error",
+                threadId: options.threadId,
+                cwd,
+                bridgeUrl: options.bridgeUrl,
+                error: errorText,
+              },
+            };
+          }
+          bridgeFallback = true;
+          codexLog("warn", "execute.bridge.fallback", {
             toolCallId,
             threadId: options.threadId,
             action,
             elapsedMs: Date.now() - startedAtMs,
             error: errorText,
+            bridgeUrl: options.bridgeUrl,
           });
-          return {
-            content: [{ type: "text" as const, text: `Codex ${action} failed.\n${errorText}` }],
-            details: {
-              action,
-              status: "error",
-              threadId: options.threadId,
-              cwd,
-              bridgeUrl: options.bridgeUrl,
-              error: errorText,
-            },
-          };
         }
       }
+
+      const fallbackDetails = bridgeFallback
+        ? {
+            bridgeFallback: true,
+            bridgeUrl: options.bridgeUrl ?? null,
+          }
+        : {};
 
       if (action === "start") {
         const status = options.sessionStore.start(options.threadId, cwd);
@@ -246,6 +281,7 @@ export function createCodexTool(options: {
           details: {
             action,
             ...status,
+            ...fallbackDetails,
           },
         };
         codexLog(status.running ? "info" : "error", "execute.start.result", {
@@ -275,6 +311,7 @@ export function createCodexTool(options: {
           details: {
             action,
             ...status,
+            ...fallbackDetails,
           },
         };
         codexLog("info", "execute.status.result", {
@@ -298,6 +335,7 @@ export function createCodexTool(options: {
           details: {
             action,
             ...stopped,
+            ...fallbackDetails,
           },
         };
         codexLog(stopped.stopped ? "info" : "warn", "execute.stop.result", {
@@ -387,6 +425,7 @@ export function createCodexTool(options: {
             action,
             threadId: options.threadId,
             cwd,
+            ...fallbackDetails,
           },
         };
       } catch (err) {
@@ -406,6 +445,7 @@ export function createCodexTool(options: {
             threadId: options.threadId,
             cwd,
             error: errorText,
+            ...fallbackDetails,
           },
         };
       }

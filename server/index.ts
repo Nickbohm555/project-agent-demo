@@ -8,10 +8,12 @@ import { ChatEventBus } from "./chat/chatEvents.js";
 import { ChatService } from "./chat/chatService.js";
 import { buildChatRouter } from "./chat/chatRouter.js";
 import { resolveApiPort } from "../config/ports.js";
+import { installOutboundRequestLogger } from "./agent/httpLogging.js";
 
 const app = express();
 const port = resolveApiPort();
 const envResult = loadEnvironmentFromDotenv();
+installOutboundRequestLogger();
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -25,9 +27,11 @@ const loggingFlags = {
   PI_LOG_TOOL_EVENTS: process.env.PI_LOG_TOOL_EVENTS ?? "false",
   PI_LOG_RAW_EVENTS: process.env.PI_LOG_RAW_EVENTS ?? "false",
   PI_LOG_CODEX_TOOL: process.env.PI_LOG_CODEX_TOOL ?? "true",
+  PI_LOG_PROVIDER_HEADERS: process.env.PI_LOG_PROVIDER_HEADERS ?? "true",
+  PI_LOG_CODEX_ENV: process.env.PI_LOG_CODEX_ENV ?? "true",
 };
 const eventBus = new ChatEventBus();
-const chatService = new ChatService(runtime, eventBus);
+const chatService = new ChatService(runtime, eventBus, modelConfig);
 
 app.get("/api/health", (_req, res) => {
   res.json({

@@ -22,12 +22,13 @@ export function TerminalPane({ sessionId }: TerminalPaneProps) {
     {
       id: `boot-${Date.now()}`,
       kind: "info",
-      text: "Codex terminal ready. Use Start/Send to begin a persistent Codex session.",
+      text: "Codex terminal ready. Click Start to begin a persistent Codex session, then send prompts below.",
       createdAt: nowIso(),
     },
   ]);
 
-  const canSend = useMemo(() => !busy && prompt.trim().length > 0, [busy, prompt]);
+  const canStart = useMemo(() => !busy && !running, [busy, running]);
+  const canSend = useMemo(() => !busy && running && prompt.trim().length > 0, [busy, running, prompt]);
 
   function append(kind: TerminalLine["kind"], text: string) {
     setLines((current) => [
@@ -80,6 +81,9 @@ export function TerminalPane({ sessionId }: TerminalPaneProps) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend) {
+      if (!running) {
+        append("info", "Start the Codex session first, then send your prompt.");
+      }
       return;
     }
 
@@ -87,10 +91,12 @@ export function TerminalPane({ sessionId }: TerminalPaneProps) {
     setPrompt("");
     append("command", `$ ${command}`);
 
-    if (!running) {
-      await runAction("start");
-    }
     await runAction("continue", command);
+  }
+
+  async function onStart() {
+    append("info", "Starting Codex session...");
+    await runAction("start");
   }
 
   async function onStatus() {
@@ -113,6 +119,8 @@ export function TerminalPane({ sessionId }: TerminalPaneProps) {
         sessionId={sessionId}
         busy={busy}
         running={running}
+        canStart={canStart}
+        onStart={onStart}
         onStatus={onStatus}
         onStop={onStop}
         onClear={onClear}
