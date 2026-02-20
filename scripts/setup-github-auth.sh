@@ -22,7 +22,8 @@ fi
 echo "Optional: configure WhatsApp gateway for this run."
 read -r -p "Enable WhatsApp gateway now? [y/N]: " ENABLE_WA_INPUT
 ENABLE_WA_INPUT="${ENABLE_WA_INPUT:-N}"
-if [[ "${ENABLE_WA_INPUT,,}" == "y" || "${ENABLE_WA_INPUT,,}" == "yes" ]]; then
+ENABLE_WA_LOWER="$(printf '%s' "$ENABLE_WA_INPUT" | tr '[:upper:]' '[:lower:]')"
+if [[ "$ENABLE_WA_LOWER" == "y" || "$ENABLE_WA_LOWER" == "yes" ]]; then
   ENABLE_WHATSAPP_GATEWAY="true"
   read -r -p "Provider (baileys/cloud-api) [baileys]: " WA_PROVIDER_INPUT
   WA_PROVIDER_INPUT="${WA_PROVIDER_INPUT:-baileys}"
@@ -38,7 +39,8 @@ if [[ "${ENABLE_WA_INPUT,,}" == "y" || "${ENABLE_WA_INPUT,,}" == "yes" ]]; then
     WHATSAPP_AUTH_DIR="${WA_AUTH_DIR_INPUT:-/app/.whatsapp-auth}"
     read -r -p "Print WhatsApp QR in logs? [Y/n]: " WA_QR_INPUT
     WA_QR_INPUT="${WA_QR_INPUT:-Y}"
-    if [[ "${WA_QR_INPUT,,}" == "n" || "${WA_QR_INPUT,,}" == "no" ]]; then
+    WA_QR_LOWER="$(printf '%s' "$WA_QR_INPUT" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$WA_QR_LOWER" == "n" || "$WA_QR_LOWER" == "no" ]]; then
       WHATSAPP_PRINT_QR="false"
     fi
   fi
