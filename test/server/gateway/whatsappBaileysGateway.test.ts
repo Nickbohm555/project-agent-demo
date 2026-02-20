@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBaileysSocketConfig } from "../../../server/gateway/channels/whatsapp/baileysGateway.js";
+import { __testing__, buildBaileysSocketConfig } from "../../../server/gateway/channels/whatsapp/baileysGateway.js";
 
 describe("buildBaileysSocketConfig", () => {
   it("enables emitOwnEvents when self-chat mode is on", () => {
@@ -24,5 +24,17 @@ describe("buildBaileysSocketConfig", () => {
     });
 
     expect(config.emitOwnEvents).toBe(false);
+  });
+});
+
+describe("whatsapp gateway helpers", () => {
+  it("filters recently sent messages within ttl", () => {
+    const sent = new Map<string, number>([["msg-1", 1000]]);
+    expect(__testing__.isRecentlySent(sent, 2000, "msg-1", 2500)).toBe(true);
+    expect(__testing__.isRecentlySent(sent, 2000, "msg-1", 4001)).toBe(false);
+  });
+
+  it("prefixes outbound replies", () => {
+    expect(__testing__.decorateReply("hello", "bohm-agent")).toBe("bohm-agent: hello");
   });
 });

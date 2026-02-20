@@ -14,9 +14,13 @@ type BaileysSocket = {
   ev: {
     on: (event: string, listener: (...args: unknown[]) => void | Promise<void>) => void;
   };
-  sendMessage: (jid: string, content: { text: string }) => Promise<unknown>;
+  sendMessage: (
+    jid: string,
+    content: { text: string },
+  ) => Promise<{ key?: { id?: string } } | undefined>;
   end?: (error?: Error) => void;
   ws?: { close?: () => void };
+  user?: { id?: string };
 };
 
 type BaileysModule = {
@@ -81,6 +85,8 @@ export class WhatsAppBaileysGateway {
   private connected = false;
   private reconnectAttempts = 0;
   private qrTerminal: QrCodeTerminal | null = null;
+  private sentMessageIds = new Map<string, number>();
+  private sentMessageTtlMs = 2 * 60 * 1000;
 
   constructor(private options: WhatsAppBaileysGatewayOptions) {}
 
@@ -124,7 +130,11 @@ export class WhatsAppBaileysGateway {
     if (!this.socket) {
       throw new Error("WhatsApp Baileys socket is not connected");
     }
-    await this.socket.sendMessage(jid, { text });
+    const result = await this.socket.sendMessage(jid, { text });
+    const messageId = result?.key?.id;
+    if (messageId) {
+      this.sentMessageIds.set(messageId, Date.now());
+    }
   }
 
   private async runLoop(): Promise<void> {
@@ -232,6 +242,11 @@ export class WhatsAppBaileysGateway {
         key?: { fromMe?: boolean; remoteJid?: string };
         message?: unknown;
       };
+      const messageId = String((rawMessage as { key?: { id?: string } }).key?.id ?? "").trim();
+      if (debug.key?.fromMe && messageId && this.isRecentlySent(messageId)) {
+        console.log(`[gateway/whatsapp] skipping echo for messageId=${messageId}`);
+        continue;
+      }
       const extracted = extractBaileysText(debug as never);
       console.log(
         `[gateway/whatsapp] message fromMe=${Boolean(debug.key?.fromMe)} remoteJid=${debug.key?.remoteJid ?? "unknown"} textLen=${extracted.length}`,
@@ -264,7 +279,7 @@ export class WhatsAppBaileysGateway {
         const replyJid =
           (inbound.metadata as { replyToJid?: string } | undefined)?.replyToJid ??
           inbound.conversationId;
-        await this.sendText(replyJid, routeResult.assistantText);
+        await this.sendText(replyJid, this.decorateReply(routeResult.assistantText));
         console.log("[gateway/whatsapp] reply sent successfully");
       } catch (error) {
         console.error(
@@ -282,7 +297,37 @@ export class WhatsAppBaileysGateway {
       return undefined;
     }
   }
+
+  private isRecentlySent(messageId: string): boolean {
+    return isRecentlySent(this.sentMessageIds, this.sentMessageTtlMs, messageId, Date.now());
+  }
+
+  private decorateReply(text: string): string {
+    return decorateReply(text, "bohm-agent");
+  }
 }
+
+export function isRecentlySent(
+  sentMap: Map<string, number>,
+  ttlMs: number,
+  messageId: string,
+  nowMs: number,
+): boolean {
+  const cutoff = nowMs - ttlMs;
+  for (const [id, timestamp] of sentMap) {
+    if (timestamp < cutoff) {
+      sentMap.delete(id);
+    }
+  }
+  const sentAt = sentMap.get(messageId);
+  return typeof sentAt === "number" && sentAt >= cutoff;
+}
+
+export function decorateReply(text: string, prefix: string): string {
+  return `${prefix}: ${text}`;
+}
+
+export const __testing__ = { isRecentlySent, decorateReply };
 
 export function buildBaileysSocketConfig(input: {
   creds: unknown;

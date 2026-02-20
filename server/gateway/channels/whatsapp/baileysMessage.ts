@@ -112,6 +112,10 @@ export function mapBaileysInbound(
     options.debug?.("missing_text", { remoteJid, contentType, messageKeys });
     return null;
   }
+  if (raw.key?.fromMe && options.selfChatMode && text.startsWith("bohm-agent:")) {
+    options.debug?.("self_reply_filtered", { remoteJid });
+    return null;
+  }
 
   const sourceId = String(raw.key?.id ?? "").trim();
   const userId = String(raw.key?.participant || conversationId || "").trim();

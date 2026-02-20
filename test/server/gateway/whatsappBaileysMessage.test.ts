@@ -160,4 +160,22 @@ describe("mapBaileysInbound", () => {
 
     expect(mapped).toBeNull();
   });
+
+  it("filters self-chat replies prefixed with bohm-agent", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE7",
+          fromMe: true,
+          remoteJid: "219739787915460@lid",
+        },
+        message: {
+          conversation: "bohm-agent: hello there",
+        },
+      },
+      { selfChatMode: true, selfJid: "15550001111@s.whatsapp.net" },
+    );
+
+    expect(mapped).toBeNull();
+  });
 });
