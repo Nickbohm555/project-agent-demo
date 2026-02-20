@@ -20,6 +20,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [runPhase, setRunPhase] = useState<"idle" | "running" | "error" | "done">("idle");
   const [toolCatalog, setToolCatalog] = useState<NonNullable<AgentRuntimeInfo["toolCatalog"]>>([]);
   const logRef = useRef<HTMLElement | null>(null);
+  const autoScrollRef = useRef(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,8 +132,19 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
     if (!logRef.current) {
       return;
     }
-    logRef.current.scrollTop = logRef.current.scrollHeight;
+    if (autoScrollRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
   }, [messages, liveAssistant, liveTool]);
+
+  function handleLogScroll() {
+    const log = logRef.current;
+    if (!log) {
+      return;
+    }
+    const distanceFromBottom = log.scrollHeight - log.scrollTop - log.clientHeight;
+    autoScrollRef.current = distanceFromBottom < 120;
+  }
 
   const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
 
@@ -193,7 +205,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         </aside>
       </header>
 
-      <section className="chat-log" aria-live="polite" ref={logRef}>
+      <section className="chat-log" aria-live="polite" ref={logRef} onScroll={handleLogScroll}>
         {loading ? <p className="status">Loading chat...</p> : null}
         {messages.length === 0 ? <p className="status">No messages yet.</p> : null}
 
