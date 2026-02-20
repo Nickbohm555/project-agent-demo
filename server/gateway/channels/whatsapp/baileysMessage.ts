@@ -74,14 +74,20 @@ export function extractBaileysText(raw: BaileysIncoming): string {
 
 export function mapBaileysInbound(
   raw: BaileysIncoming,
-  options: { selfChatMode?: boolean; selfJid?: string | null } = {},
+  options: {
+    selfChatMode?: boolean;
+    selfJid?: string | null;
+    debug?: (reason: string, details?: Record<string, unknown>) => void;
+  } = {},
 ): InternalMessage | null {
   if (raw.key?.fromMe && !options.selfChatMode) {
+    options.debug?.("fromMe_filtered", { selfChatMode: options.selfChatMode });
     return null;
   }
 
   const remoteJid = String(raw.key?.remoteJid ?? "").trim();
   if (!remoteJid) {
+    options.debug?.("missing_remote_jid");
     return null;
   }
   const conversationId =
@@ -91,12 +97,14 @@ export function mapBaileysInbound(
 
   const text = extractBaileysText(raw);
   if (!text) {
+    options.debug?.("missing_text", { remoteJid });
     return null;
   }
 
   const sourceId = String(raw.key?.id ?? "").trim();
   const userId = String(raw.key?.participant ?? conversationId ?? "").trim();
   if (!userId) {
+    options.debug?.("missing_user_id", { remoteJid, conversationId });
     return null;
   }
 
