@@ -3,6 +3,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import { AgentSessionStore } from "./agentSessionStore.js";
 import type { AgentRuntime, AgentRuntimeRequest, AgentRuntimeResponse } from "./types.js";
+import { getToolOutputText } from "./toolOutput.js";
 
 function extractText(message: AgentMessage | undefined): string {
   if (!message || message.role !== "assistant") {
@@ -47,17 +48,18 @@ function eventSnippet(event: AgentSessionEvent): string | undefined {
   return undefined;
 }
 
-function getToolOutputText(event: AgentSessionEvent): string | undefined {
-  if (event.type !== "tool_execution_update") {
+function formatToolArgs(args: unknown): string | undefined {
+  if (args == null) {
     return undefined;
   }
-  const partialResult = event.partialResult as { content?: Array<{ type?: string; text?: string }> };
-  const chunks = Array.isArray(partialResult?.content) ? partialResult.content : [];
-  const text = chunks
-    .map((chunk) => (chunk?.type === "text" && typeof chunk.text === "string" ? chunk.text : ""))
-    .filter(Boolean)
-    .join("");
-  return text || undefined;
+  if (typeof args === "string") {
+    return args;
+  }
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return String(args);
+  }
 }
 
 export class EmbeddedPiRuntime implements AgentRuntime {
@@ -73,6 +75,8 @@ export class EmbeddedPiRuntime implements AgentRuntime {
       const logAssistant = envFlag("PI_LOG_ASSISTANT_DELTAS");
       const logTools = envFlag("PI_LOG_TOOL_EVENTS");
       const logRaw = envFlag("PI_LOG_RAW_EVENTS");
+      const toolOutputState = new Map<string, { sawUpdate: boolean }>();
+      const toolUsage = new Set<string>();
 
       const unsubscribe = record.session.subscribe((event) => {
         if (logRaw) {
@@ -99,12 +103,12 @@ export class EmbeddedPiRuntime implements AgentRuntime {
             }
           }
 
-          if (
-            logTools &&
-            (event.type === "tool_execution_start" ||
-              event.type === "tool_execution_update" ||
-              event.type === "tool_execution_end")
-          ) {
+        if (
+          logTools &&
+          (event.type === "tool_execution_start" ||
+            event.type === "tool_execution_update" ||
+            event.type === "tool_execution_end")
+        ) {
             const toolName = "toolName" in event ? event.toolName : "unknown";
             console.log(
               `[embedded-pi] tool agent=${input.agentId} session=${record.session.sessionId} type=${event.type} name=${toolName}`,
@@ -125,7 +129,38 @@ export class EmbeddedPiRuntime implements AgentRuntime {
           }
         }
 
-        if (event.type === "tool_execution_update") {
+        if (event.type === "tool_execution_start") {
+          if (event.toolName) {
+            toolUsage.add(event.toolName);
+          }
+          const toolArgs = "args" in event ? formatToolArgs((event as { args?: unknown }).args) : undefined;
+          input.emit?.({
+            type: "tool_call",
+            toolName: event.toolName,
+            text: toolArgs,
+          });
+        }
+
+        if (event.type === "tool_execution_update" || event.type === "tool_execution_end") {
+          const toolCallId =
+            "toolCallId" in event && typeof event.toolCallId === "string" ? event.toolCallId : null;
+
+          if (event.type === "tool_execution_update" && toolCallId) {
+            toolOutputState.set(toolCallId, { sawUpdate: true });
+          }
+
+          if (event.toolName) {
+            toolUsage.add(event.toolName);
+          }
+
+          if (event.type === "tool_execution_end" && toolCallId) {
+            const state = toolOutputState.get(toolCallId);
+            if (state?.sawUpdate) {
+              toolOutputState.delete(toolCallId);
+              return;
+            }
+          }
+
           const outputText = getToolOutputText(event);
           if (outputText) {
             input.emit?.({
@@ -133,6 +168,10 @@ export class EmbeddedPiRuntime implements AgentRuntime {
               toolName: event.toolName,
               text: outputText,
             });
+          }
+
+          if (event.type === "tool_execution_end" && toolCallId) {
+            toolOutputState.delete(toolCallId);
           }
         }
       });
@@ -148,11 +187,14 @@ export class EmbeddedPiRuntime implements AgentRuntime {
       const nextMessages = record.session.state.messages.slice(beforeCount);
       const lastAssistant = [...nextMessages].reverse().find((message) => message.role === "assistant");
       const assistantText = extractText(lastAssistant) || "Agent completed with no assistant text.";
+      const toolAttribution =
+        toolUsage.size > 0 ? `Source: ${[...toolUsage].join(", ")} tool output.` : null;
 
       return {
         runId: input.runId || randomUUID(),
         status: "completed",
         assistantText,
+        toolAttribution,
         diagnostics: {
           adapter: this.name,
           agentId: input.agentId,

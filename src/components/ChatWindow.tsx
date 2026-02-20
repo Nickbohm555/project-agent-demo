@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { fetchHistory, fetchRuntimeInfo, sendMessage } from "../lib/api";
 import type { AgentRuntimeInfo, ChatMessage, ChatStreamEvent } from "../types/chat";
 
@@ -15,7 +15,9 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [error, setError] = useState<string | null>(null);
   const [liveAssistant, setLiveAssistant] = useState("");
   const [liveTool, setLiveTool] = useState("");
+  const [liveToolName, setLiveToolName] = useState<string | null>(null);
   const [toolCatalog, setToolCatalog] = useState<NonNullable<AgentRuntimeInfo["toolCatalog"]>>([]);
+  const logRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +94,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         if (payload.type === "lifecycle" && payload.phase === "start") {
           setLiveAssistant("");
           setLiveTool("");
+          setLiveToolName(null);
           return;
         }
         if (payload.type === "assistant_delta" && payload.text) {
@@ -100,6 +103,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         }
         if (payload.type === "tool_output" && payload.text) {
           setLiveTool((current) => `${current}${payload.text}`.slice(-12_000));
+          setLiveToolName((current) => payload.toolName ?? current);
         }
       } catch {
         // ignore malformed SSE payload
@@ -110,6 +114,13 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
     };
     return () => eventSource.close();
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!logRef.current) {
+      return;
+    }
+    logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [messages, liveAssistant, liveTool]);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
 
@@ -170,13 +181,20 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         </aside>
       </header>
 
-      <section className="chat-log" aria-live="polite">
+      <section className="chat-log" aria-live="polite" ref={logRef}>
         {loading ? <p className="status">Loading chat...</p> : null}
         {messages.length === 0 ? <p className="status">No messages yet.</p> : null}
 
         {liveTool ? (
           <article className="live-panel">
-            <span className="role">tool stream</span>
+            <span className="role">
+              tool stream{liveToolName ? ` (${liveToolName})` : ""}
+            </span>
+            {liveToolName ? (
+              <span className="tool-source">Message sent by {liveToolName}.</span>
+            ) : (
+              <span className="tool-source">Message sent by tool.</span>
+            )}
             <pre>{liveTool}</pre>
           </article>
         ) : null}

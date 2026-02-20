@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { executeCodexAction } from "../lib/api";
 import type { CodexAction } from "../types/chat";
+import { mergeCodexOutput } from "./terminal/terminalOutput";
 import { TerminalComposer } from "./terminal/TerminalComposer";
 import { TerminalHeader } from "./terminal/TerminalHeader";
 import { TerminalLog } from "./terminal/TerminalLog";
@@ -62,15 +63,8 @@ export function TerminalPane({ sessionId }: TerminalPaneProps) {
         setRunning(true);
       }
 
-      const streamText = response.streamText.trim();
-      const text = response.text.trim();
-
-      if (streamText) {
-        append("output", streamText);
-      }
-      if (text) {
-        append("output", text);
-      }
+      const outputs = mergeCodexOutput(response.streamText, response.text);
+      outputs.forEach((output) => append("output", output));
     } catch (err) {
       append("error", String(err));
     } finally {

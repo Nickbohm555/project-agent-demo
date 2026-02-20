@@ -128,7 +128,7 @@ export class ChatService {
       role: "assistant",
       text:
         run.status === "completed"
-          ? run.assistantText
+          ? [run.assistantText, run.toolAttribution].filter(Boolean).join("\n\n")
           : `Agent run failed.\n${run.assistantText}\n${JSON.stringify(run.diagnostics ?? {}, null, 2)}`,
       createdAt: new Date().toISOString(),
     };

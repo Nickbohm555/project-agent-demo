@@ -2,6 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createCodexTool } from "./codexTool.js";
+import type { ChatEventBus } from "../chat/chatEvents.js";
 import type { AgentToolConfig } from "./toolConfig.js";
 import { getCodexSessionStore } from "./toolConfig.js";
 
@@ -134,10 +135,12 @@ export function buildCodexRouter(
   toolConfig: AgentToolConfig,
   options?: {
     execute?: (input: CodexRouteExecuteInput) => Promise<CodexRouteExecuteResult>;
+    events?: ChatEventBus;
   },
 ): Router {
   const router = Router();
   const execute = options?.execute ?? executeCodexAction;
+  const events = options?.events;
 
   router.post("/execute", async (req, res) => {
     const httpRequestId = `http-${randomUUID()}`;
@@ -171,6 +174,17 @@ export function buildCodexRouter(
     }
 
     const { sessionId, action, prompt } = parsed.data;
+    const runId = randomUUID();
+
+    if (events) {
+      events.publish({
+        sessionId,
+        runId,
+        type: "lifecycle",
+        phase: "start",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     try {
       codexRouteLog("info", "http.execute.start", {
@@ -186,6 +200,35 @@ export function buildCodexRouter(
         prompt,
         toolConfig,
       });
+      if (events) {
+        if (result.streamText.trim()) {
+          events.publish({
+            sessionId,
+            runId,
+            type: "tool_output",
+            toolName: "codex",
+            text: result.streamText,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        if (result.text.trim()) {
+          events.publish({
+            sessionId,
+            runId,
+            type: "tool_output",
+            toolName: "codex",
+            text: result.text,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        events.publish({
+          sessionId,
+          runId,
+          type: "lifecycle",
+          phase: "end",
+          timestamp: new Date().toISOString(),
+        });
+      }
       res.json({
         ok: true,
         sessionId,
@@ -205,6 +248,16 @@ export function buildCodexRouter(
         streamTextChars: result.streamText.length,
       });
     } catch (err) {
+      if (events) {
+        events.publish({
+          sessionId,
+          runId,
+          type: "lifecycle",
+          phase: "error",
+          text: String(err),
+          timestamp: new Date().toISOString(),
+        });
+      }
       codexRouteLog("error", "http.execute.error", {
         httpRequestId,
         sessionId,

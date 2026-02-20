@@ -171,7 +171,7 @@ export function createCodexTool(options: {
     name: "codex",
     label: "Codex Session",
     description:
-      "Manage a long-lived Codex CLI session for the current chat session. Actions: start, continue, stop, status. Do not ask the user for threadId/session identifiers; they are provided internally by the server.",
+      "Manage a long-lived Codex CLI session for the current chat session. Use ONLY when the user explicitly requests running the Codex tool in their current message. Actions: start, continue, stop, status. Do not ask the user for threadId/session identifiers; they are provided internally by the server.",
     parameters: codexToolSchema,
     execute: async (toolCallId, params: CodexToolInput, signal, onUpdate) => {
       const startedAtMs = Date.now();

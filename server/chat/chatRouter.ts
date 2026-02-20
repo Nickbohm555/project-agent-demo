@@ -72,6 +72,25 @@ export function buildChatRouter(chatService: ChatService, events: ChatEventBus):
     res.json(session);
   });
 
+  router.get("/tool-log", (req, res) => {
+    const sessionId = String(req.query.sessionId ?? "").trim();
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+    res.json({ entries: events.getToolLog(sessionId) });
+  });
+
+  router.delete("/tool-log", (req, res) => {
+    const sessionId = String(req.query.sessionId ?? "").trim();
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+    events.clearToolLog(sessionId);
+    res.json({ ok: true });
+  });
+
   router.post("/send", async (req, res) => {
     const parsed = sendRequestSchema.safeParse(req.body);
     if (!parsed.success) {

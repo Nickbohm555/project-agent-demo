@@ -29,7 +29,7 @@ export type SendChatResponse = {
 export type ChatStreamEvent = {
   sessionId: string;
   runId: string;
-  type: "lifecycle" | "assistant_delta" | "tool_output";
+  type: "lifecycle" | "assistant_delta" | "tool_call" | "tool_output";
   phase?: "start" | "end" | "error";
   text?: string;
   toolName?: string;

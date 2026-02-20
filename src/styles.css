@@ -12,31 +12,45 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100%;
   font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
   color: var(--ink);
   background:
     radial-gradient(circle at 20% 10%, #ffdfba 0%, transparent 35%),
     radial-gradient(circle at 80% 90%, #bdd9ff 0%, transparent 30%),
     var(--bg);
+  overflow: hidden;
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
   padding: 1rem;
+  display: flex;
 }
 
 .app-shell {
   max-width: 980px;
   margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .top-tabs {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 1rem;
 }
 
 .top-tabs button {
@@ -62,6 +76,9 @@ body {
   border-radius: 16px;
   box-shadow: 0 24px 50px rgb(0 0 0 / 8%);
   overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-header {
@@ -70,6 +87,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+  background: color-mix(in oklab, var(--surface) 96%, white);
 }
 
 .chat-header h1 {
@@ -135,6 +153,8 @@ body {
   flex-direction: column;
   gap: 0.75rem;
   overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .bubble {
@@ -227,6 +247,124 @@ body {
   color: var(--error);
 }
 
+.tool-log-shell {
+  margin: 1.5rem auto;
+  width: min(980px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tool-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #f3efe7;
+  border: 1px solid #d8d2c8;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.tool-log-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.tool-log-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #4a433a;
+}
+
+.tool-log-header button {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #d0c6ba;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tool-log-header button:hover {
+  background: #f9f4ec;
+}
+
+.tool-log-list {
+  border: 1px solid #d8d2c8;
+  border-radius: 14px;
+  padding: 1rem;
+  background: #fffaf2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  overflow: auto;
+}
+
+.tool-log-entry {
+  border-radius: 10px;
+  border: 1px solid #d8d2c8;
+  padding: 0.75rem;
+  background: #ffffff;
+}
+
+.tool-log-call {
+  background: #f3f7ff;
+}
+
+.tool-log-output {
+  background: #fef6ea;
+}
+
+.tool-log-meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #554d44;
+}
+
+.tool-log-kind {
+  font-weight: 700;
+}
+
+.tool-log-name {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.tool-log-time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-log-entry pre {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.connected {
+  color: #1d7a2b;
+  font-weight: 600;
+}
+
+.connecting {
+  color: #9b6b00;
+  font-weight: 600;
+}
+
+.disconnected {
+  color: #a0352b;
+  font-weight: 600;
+}
+
 .terminal-shell {
   background: #111315;
   border: 1px solid #262a2e;
@@ -244,6 +382,9 @@ body {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #2e3338;
   background: #15181b;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .terminal-header p {

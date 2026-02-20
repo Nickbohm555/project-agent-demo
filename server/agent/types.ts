@@ -14,6 +14,7 @@ export type AgentRuntimeResponse = {
   status: "completed" | "failed";
   assistantText: string;
   diagnostics?: Record<string, unknown>;
+  toolAttribution?: string | null;
 };
 
 export interface AgentRuntime {
