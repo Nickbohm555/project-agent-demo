@@ -29,6 +29,20 @@ React Chat UI
   <- returns session transcript
 ```
 
+## Gateway flow (WhatsApp + future channels)
+
+```text
+Inbound Provider Event
+  -> Channel Adapter (WhatsApp Baileys / Cloud API)
+    -> InternalMessage (normalized)
+      -> GatewayRouter
+        -> InboundDeduper (optional)
+        -> ConversationSessionStore (channel + conversationId -> sessionId)
+        -> ChatService.sendMessage(...)
+          -> AgentRuntime.run(...)
+      -> Outbound Adapter sends reply back to provider
+```
+
 ## Layer responsibilities
 
 1. UI layer (`src/components/ChatWindow.tsx`)
