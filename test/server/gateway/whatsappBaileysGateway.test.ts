@@ -37,4 +37,9 @@ describe("whatsapp gateway helpers", () => {
   it("prefixes outbound replies", () => {
     expect(__testing__.decorateReply("hello", "bohm-agent")).toBe("bohm-agent: hello");
   });
+
+  it("trims streaming updates to a max length", () => {
+    expect(__testing__.trimStreamText("  hello  ", 10)).toBe("hello");
+    expect(__testing__.trimStreamText("a".repeat(20), 10)).toBe("aaaaaaa...");
+  });
 });

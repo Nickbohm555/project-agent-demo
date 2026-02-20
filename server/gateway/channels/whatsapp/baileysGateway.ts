@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import type { ChatStreamEvent } from "../../../chat/chatEvents.js";
 import type { GatewayRouter } from "../../core/router.js";
 import { extractBaileysText, mapBaileysInbound } from "./baileysMessage.js";
 
@@ -269,16 +270,20 @@ export class WhatsAppBaileysGateway {
         console.log(
           `[gateway/whatsapp] routing message to agent: conversationId=${inbound.conversationId} text="${inbound.text.slice(0, 80)}"`,
         );
-        const routeResult = await this.options.gatewayRouter.routeInbound(inbound);
+        const replyJid =
+          (inbound.metadata as { replyToJid?: string } | undefined)?.replyToJid ??
+          inbound.conversationId;
+        const streamState = createStreamState(replyJid, (text) => this.sendText(replyJid, text));
+        const routeResult = await this.options.gatewayRouter.routeInbound(inbound, {
+          onEvent: (event) => streamState.handleEvent(event),
+        });
+        await streamState.flushFinal();
         console.log(
           `[gateway/whatsapp] route result: skipped=${routeResult.skipped} runStatus=${routeResult.runStatus} hasAssistantText=${Boolean(routeResult.assistantText)}`,
         );
         if (routeResult.skipped || !routeResult.assistantText) {
           continue;
         }
-        const replyJid =
-          (inbound.metadata as { replyToJid?: string } | undefined)?.replyToJid ??
-          inbound.conversationId;
         await this.sendText(replyJid, this.decorateReply(routeResult.assistantText));
         console.log("[gateway/whatsapp] reply sent successfully");
       } catch (error) {
@@ -307,6 +312,73 @@ export class WhatsAppBaileysGateway {
   }
 }
 
+type StreamState = {
+  handleEvent: (event: ChatStreamEvent) => void;
+  flushFinal: () => Promise<void>;
+};
+
+const STREAM_FLUSH_DELAY_MS = 1500;
+const STREAM_MAX_UPDATES = 5;
+const STREAM_MAX_CHARS = 1200;
+
+function createStreamState(replyJid: string, send: (text: string) => Promise<void>): StreamState {
+  let buffer = "";
+  let timer: NodeJS.Timeout | null = null;
+  let updatesSent = 0;
+  let started = false;
+
+  const flush = async (final: boolean) => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    const trimmed = trimStreamText(buffer, STREAM_MAX_CHARS);
+    if (!trimmed) {
+      buffer = "";
+      return;
+    }
+    if (updatesSent >= STREAM_MAX_UPDATES) {
+      buffer = "";
+      return;
+    }
+    const prefix = final ? "final" : "stream";
+    await send(decorateReply(`[${prefix}] ${trimmed}`, "bohm-agent"));
+    updatesSent += 1;
+    buffer = "";
+  };
+
+  const schedule = () => {
+    if (timer) {
+      return;
+    }
+    timer = setTimeout(() => {
+      void flush(false);
+    }, STREAM_FLUSH_DELAY_MS);
+  };
+
+  return {
+    handleEvent: (event) => {
+      if (event.type === "lifecycle" && event.phase === "start" && !started) {
+        started = true;
+        void send(decorateReply("Working on it...", "bohm-agent"));
+      }
+      if (event.type === "tool_output" && event.toolName === "codex") {
+        if (updatesSent >= STREAM_MAX_UPDATES) {
+          return;
+        }
+        buffer += `\n${event.text ?? ""}`;
+        schedule();
+      }
+      if (event.type === "lifecycle" && (event.phase === "end" || event.phase === "error")) {
+        void flush(true);
+      }
+    },
+    flushFinal: async () => {
+      await flush(true);
+    },
+  };
+}
+
 export function isRecentlySent(
   sentMap: Map<string, number>,
   ttlMs: number,
@@ -327,7 +399,18 @@ export function decorateReply(text: string, prefix: string): string {
   return `${prefix}: ${text}`;
 }
 
-export const __testing__ = { isRecentlySent, decorateReply };
+export function trimStreamText(text: string, maxChars: number): string {
+  const normalized = text.replace(/\s+\n/g, "\n").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
+export const __testing__ = { isRecentlySent, decorateReply, trimStreamText };
 
 export function buildBaileysSocketConfig(input: {
   creds: unknown;

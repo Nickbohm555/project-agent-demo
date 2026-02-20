@@ -41,6 +41,7 @@ const chatService = new ChatService(runtime, eventBus, modelConfig);
 const gatewayConfig = loadGatewayConfig();
 const gatewayRouter = new GatewayRouter({
   chatService,
+  events: eventBus,
   sessionStore: new ConversationSessionStore(),
   deduper: new InboundDeduper(),
   defaultAgentId: "gateway-agent",

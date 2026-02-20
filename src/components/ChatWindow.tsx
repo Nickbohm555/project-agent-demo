@@ -16,6 +16,8 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
   const [liveAssistant, setLiveAssistant] = useState("");
   const [liveTool, setLiveTool] = useState("");
   const [liveToolName, setLiveToolName] = useState<string | null>(null);
+  const [liveToolArgs, setLiveToolArgs] = useState<string | null>(null);
+  const [runPhase, setRunPhase] = useState<"idle" | "running" | "error" | "done">("idle");
   const [toolCatalog, setToolCatalog] = useState<NonNullable<AgentRuntimeInfo["toolCatalog"]>>([]);
   const logRef = useRef<HTMLElement | null>(null);
 
@@ -92,15 +94,28 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
           setLiveAssistant("");
           setLiveTool("");
           setLiveToolName(null);
+          setLiveToolArgs(null);
+          setRunPhase("running");
+          return;
+        }
+        if (payload.type === "lifecycle" && (payload.phase === "end" || payload.phase === "error")) {
+          setRunPhase(payload.phase === "error" ? "error" : "done");
           return;
         }
         if (payload.type === "assistant_delta" && payload.text) {
           setLiveAssistant(payload.text);
           return;
         }
+        if (payload.type === "tool_call") {
+          setLiveToolName(payload.toolName ?? null);
+          setLiveToolArgs(payload.text ?? null);
+          setRunPhase("running");
+          return;
+        }
         if (payload.type === "tool_output" && payload.text) {
           setLiveTool((current) => `${current}${payload.text}`.slice(-12_000));
           setLiveToolName((current) => payload.toolName ?? current);
+          setRunPhase("running");
         }
       } catch {
         // ignore malformed SSE payload
@@ -182,7 +197,7 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
         {loading ? <p className="status">Loading chat...</p> : null}
         {messages.length === 0 ? <p className="status">No messages yet.</p> : null}
 
-        {liveTool ? (
+        {runPhase === "running" || liveTool ? (
           <article className="live-panel">
             <span className="role">
               tool stream{liveToolName ? ` (${liveToolName})` : ""}
@@ -192,7 +207,8 @@ export function ChatWindow({ agentId, sessionId }: ChatWindowProps) {
             ) : (
               <span className="tool-source">Message sent by tool.</span>
             )}
-            <pre>{liveTool}</pre>
+            {liveToolArgs ? <span className="tool-source">Args: {liveToolArgs}</span> : null}
+            {liveTool ? <pre>{liveTool}</pre> : <p className="status">Waiting for tool output...</p>}
           </article>
         ) : null}
 
