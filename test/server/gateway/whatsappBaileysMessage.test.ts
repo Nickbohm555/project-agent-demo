@@ -99,6 +99,7 @@ describe("mapBaileysInbound", () => {
       conversationId: "15550001111@s.whatsapp.net",
       userId: "15550001111@s.whatsapp.net",
     });
+    expect(mapped?.metadata?.replyToJid).toBe("219739787915460@lid");
   });
 
   it("extracts text from wrapped messages", () => {

@@ -130,6 +130,8 @@ export function mapBaileysInbound(
     metadata: {
       sourceMessageId: sourceId || undefined,
       provider: "baileys",
+      replyToJid:
+        options.selfChatMode && remoteJid.endsWith("@lid") ? remoteJid : undefined,
     },
   };
 }

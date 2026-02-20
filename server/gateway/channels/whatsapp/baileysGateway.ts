@@ -261,7 +261,10 @@ export class WhatsAppBaileysGateway {
         if (routeResult.skipped || !routeResult.assistantText) {
           continue;
         }
-        await this.sendText(inbound.conversationId, routeResult.assistantText);
+        const replyJid =
+          (inbound.metadata as { replyToJid?: string } | undefined)?.replyToJid ??
+          inbound.conversationId;
+        await this.sendText(replyJid, routeResult.assistantText);
         console.log("[gateway/whatsapp] reply sent successfully");
       } catch (error) {
         console.error(
