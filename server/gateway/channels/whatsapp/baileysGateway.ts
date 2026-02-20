@@ -159,18 +159,15 @@ export class WhatsAppBaileysGateway {
     const { state, saveCreds } = await baileys.useMultiFileAuthState(this.options.authDir);
     const version = await this.resolveBaileysVersion(baileys);
 
-    const socket = baileys.makeWASocket({
-      auth: {
+    const socket = baileys.makeWASocket(
+      buildBaileysSocketConfig({
         creds: state.creds,
-        keys: baileys.makeCacheableSignalKeyStore(state.keys, silentBaileysLogger),
-      },
-      version,
-      logger: silentBaileysLogger,
-      printQRInTerminal: false,
-      syncFullHistory: false,
-      markOnlineOnConnect: false,
-      browser: ["project-agent-demo", "gateway", "1.0.0"],
-    });
+        keys: state.keys,
+        keyStoreFactory: (keys) => baileys.makeCacheableSignalKeyStore(keys, silentBaileysLogger),
+        version,
+        selfChatMode: this.options.selfChatMode,
+      }),
+    );
     this.socket = socket;
 
     socket.ev.on("creds.update", async () => {
@@ -251,4 +248,26 @@ export class WhatsAppBaileysGateway {
       return undefined;
     }
   }
+}
+
+export function buildBaileysSocketConfig(input: {
+  creds: unknown;
+  keys: unknown;
+  keyStoreFactory: (keys: unknown) => unknown;
+  version?: number[];
+  selfChatMode: boolean;
+}): Record<string, unknown> {
+  return {
+    auth: {
+      creds: input.creds,
+      keys: input.keyStoreFactory(input.keys),
+    },
+    version: input.version,
+    logger: silentBaileysLogger,
+    printQRInTerminal: false,
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    emitOwnEvents: input.selfChatMode,
+    browser: ["project-agent-demo", "gateway", "1.0.0"],
+  };
 }
