@@ -55,20 +55,20 @@ describe("mapBaileysInbound", () => {
     ).toBeNull();
   });
 
-  it("allows self-chat messages when enabled", () => {
+  it("allows self-chat messages when enabled for lid chats", () => {
     const mapped = mapBaileysInbound(
       {
         key: {
           id: "BAE2",
           fromMe: true,
-          remoteJid: "15550001111@s.whatsapp.net",
+          remoteJid: "219739787915460@lid",
         },
         message: {
           conversation: "self chat ok",
         },
         messageTimestamp: 1_700_000_123,
       },
-      { selfChatMode: true },
+      { selfChatMode: true, selfJid: "15550001111@s.whatsapp.net" },
     );
 
     expect(mapped).toMatchObject({
@@ -128,7 +128,7 @@ describe("mapBaileysInbound", () => {
       {
         key: {
           id: "BAE5",
-          fromMe: true,
+          fromMe: false,
           remoteJid: "15550001111@s.whatsapp.net",
           participant: "",
         },
@@ -140,5 +140,23 @@ describe("mapBaileysInbound", () => {
     );
 
     expect(mapped?.userId).toBe("15550001111@s.whatsapp.net");
+  });
+
+  it("filters self-chat echoes for non-lid remote jids", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE6",
+          fromMe: true,
+          remoteJid: "15550001111@s.whatsapp.net",
+        },
+        message: {
+          conversation: "echo message",
+        },
+      },
+      { selfChatMode: true, selfJid: "15550001111@s.whatsapp.net" },
+    );
+
+    expect(mapped).toBeNull();
   });
 });

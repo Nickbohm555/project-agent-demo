@@ -94,6 +94,11 @@ export function mapBaileysInbound(
     options.debug?.("missing_remote_jid");
     return null;
   }
+
+  if (raw.key?.fromMe && options.selfChatMode && !remoteJid.endsWith("@lid")) {
+    options.debug?.("fromMe_echo_filtered", { remoteJid });
+    return null;
+  }
   const conversationId =
     options.selfChatMode && options.selfJid && remoteJid.endsWith("@lid")
       ? options.selfJid
