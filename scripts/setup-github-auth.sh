@@ -37,12 +37,8 @@ if [[ "$ENABLE_WA_LOWER" == "y" || "$ENABLE_WA_LOWER" == "yes" ]]; then
   if [[ "$WHATSAPP_PROVIDER" == "baileys" ]]; then
     read -r -p "Auth dir inside container [/app/.whatsapp-auth]: " WA_AUTH_DIR_INPUT
     WHATSAPP_AUTH_DIR="${WA_AUTH_DIR_INPUT:-/app/.whatsapp-auth}"
-    read -r -p "Print WhatsApp QR in logs? [Y/n]: " WA_QR_INPUT
-    WA_QR_INPUT="${WA_QR_INPUT:-Y}"
-    WA_QR_LOWER="$(printf '%s' "$WA_QR_INPUT" | tr '[:upper:]' '[:lower:]')"
-    if [[ "$WA_QR_LOWER" == "n" || "$WA_QR_LOWER" == "no" ]]; then
-      WHATSAPP_PRINT_QR="false"
-    fi
+    # Always print QR so the user can scan it directly in the terminal
+    WHATSAPP_PRINT_QR="true"
   fi
 fi
 
@@ -85,8 +81,12 @@ echo "  PI_ENABLE_WHATSAPP_GATEWAY=$ENABLE_WHATSAPP_GATEWAY"
 echo "  PI_WHATSAPP_PROVIDER=$WHATSAPP_PROVIDER"
 echo "  PI_WHATSAPP_AUTH_DIR=$WHATSAPP_AUTH_DIR"
 echo "  PI_WHATSAPP_PRINT_QR=$WHATSAPP_PRINT_QR"
-if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" && "$WHATSAPP_PROVIDER" == "baileys" ]]; then
-  echo "Next step: scan the QR from container logs (docker compose logs -f app)."
-fi
 
-echo "Done."
+if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" && "$WHATSAPP_PROVIDER" == "baileys" && "$WHATSAPP_PRINT_QR" == "true" ]]; then
+  echo ""
+  echo "Waiting for WhatsApp QR code (Ctrl+C to stop)..."
+  echo ""
+  docker compose logs -f app
+else
+  echo "Done."
+fi
