@@ -42,11 +42,9 @@ if [[ "$ENABLE_WA_LOWER" == "y" || "$ENABLE_WA_LOWER" == "yes" ]]; then
   fi
 fi
 
-echo "Ensuring containers are up..."
-PI_ENABLE_WHATSAPP_GATEWAY="$ENABLE_WHATSAPP_GATEWAY" \
-PI_WHATSAPP_PROVIDER="$WHATSAPP_PROVIDER" \
-PI_WHATSAPP_AUTH_DIR="$WHATSAPP_AUTH_DIR" \
-PI_WHATSAPP_PRINT_QR="$WHATSAPP_PRINT_QR" \
+# ── Phase 1: Start container WITHOUT WhatsApp so we can do git/GitHub setup ──
+echo "Starting container (WhatsApp disabled for initial setup)..."
+PI_ENABLE_WHATSAPP_GATEWAY="false" \
 docker compose up -d --build app
 
 sleep 2
@@ -76,17 +74,39 @@ docker compose exec app /usr/bin/gh auth login -h github.com
 echo "Verifying GitHub auth..."
 docker compose exec app /usr/bin/gh auth status
 
-echo "WhatsApp gateway config used for this run:"
-echo "  PI_ENABLE_WHATSAPP_GATEWAY=$ENABLE_WHATSAPP_GATEWAY"
-echo "  PI_WHATSAPP_PROVIDER=$WHATSAPP_PROVIDER"
-echo "  PI_WHATSAPP_AUTH_DIR=$WHATSAPP_AUTH_DIR"
-echo "  PI_WHATSAPP_PRINT_QR=$WHATSAPP_PRINT_QR"
+# ── Phase 2: Restart with WhatsApp enabled so QR appears fresh ──
+if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" ]]; then
+  echo ""
+  echo "Git/GitHub setup complete. Restarting container with WhatsApp gateway enabled..."
+  PI_ENABLE_WHATSAPP_GATEWAY="$ENABLE_WHATSAPP_GATEWAY" \
+  PI_WHATSAPP_PROVIDER="$WHATSAPP_PROVIDER" \
+  PI_WHATSAPP_AUTH_DIR="$WHATSAPP_AUTH_DIR" \
+  PI_WHATSAPP_PRINT_QR="$WHATSAPP_PRINT_QR" \
+  docker compose up -d app
 
-if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" && "$WHATSAPP_PROVIDER" == "baileys" && "$WHATSAPP_PRINT_QR" == "true" ]]; then
+  sleep 2
+  if ! docker compose ps --status=running | grep -q "app"; then
+    echo "Container app is not running after restart. Recent logs:"
+    docker compose logs --tail=50 app || true
+    exit 1
+  fi
+
   echo ""
-  echo "Waiting for WhatsApp QR code (Ctrl+C to stop)..."
-  echo ""
-  docker compose logs -f app
+  echo "WhatsApp gateway config:"
+  echo "  PI_ENABLE_WHATSAPP_GATEWAY=$ENABLE_WHATSAPP_GATEWAY"
+  echo "  PI_WHATSAPP_PROVIDER=$WHATSAPP_PROVIDER"
+  echo "  PI_WHATSAPP_AUTH_DIR=$WHATSAPP_AUTH_DIR"
+  echo "  PI_WHATSAPP_PRINT_QR=$WHATSAPP_PRINT_QR"
+
+  if [[ "$WHATSAPP_PROVIDER" == "baileys" && "$WHATSAPP_PRINT_QR" == "true" ]]; then
+    echo ""
+    echo "Waiting for WhatsApp QR code — scan it with your phone (Ctrl+C to stop)..."
+    echo ""
+    docker compose logs -f --no-log-prefix app
+  else
+    echo "Done."
+  fi
 else
-  echo "Done."
+  echo ""
+  echo "Done. WhatsApp gateway is disabled."
 fi
