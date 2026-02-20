@@ -136,7 +136,7 @@ async function executeBridgeAction(input: {
   prompt?: string;
   signal?: AbortSignal;
 }): Promise<CodexBridgeResponse> {
-  const timeoutMs = envPositiveInt("PI_CODEX_BRIDGE_TIMEOUT_MS", 30_000);
+  const timeoutMs = envPositiveInt("PI_CODEX_BRIDGE_TIMEOUT_MS", 600_000);
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const requestSignal = input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal;
   const endpoint = `${normalizeBridgeUrl(input.bridgeUrl)}/execute`;
@@ -372,8 +372,8 @@ export function createCodexTool(options: {
         });
         const result = await options.sessionStore.continue(options.threadId, cwd, {
           prompt,
-          timeoutMs: envPositiveInt("PI_CODEX_TIMEOUT_MS", 30_000),
-          idleMs: envPositiveInt("PI_CODEX_IDLE_MS", 4_000),
+          timeoutMs: envPositiveInt("PI_CODEX_TIMEOUT_MS", 600_000),
+          idleMs: envPositiveInt("PI_CODEX_IDLE_MS", 600_000),
           signal,
           onChunk: (rawText) => {
             streamChunks += 1;

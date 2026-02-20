@@ -148,6 +148,11 @@ OPENAI_API_KEY=your_key_here
 PI_ENABLE_CODEX_TOOL=true
 # Optional: send codex actions to host bridge instead of running codex in this process
 PI_CODEX_BRIDGE_URL=http://127.0.0.1:43319
+# Optional: Codex time limits (defaults to 10 minutes each)
+PI_CODEX_TIMEOUT_MS=600000
+PI_CODEX_IDLE_MS=600000
+# Optional: bridge request timeout (defaults to 10 minutes)
+PI_CODEX_BRIDGE_TIMEOUT_MS=600000
 
 # Optional WhatsApp gateway bootstrap checks (Docker entrypoint)
 PI_ENABLE_WHATSAPP_GATEWAY=false
