@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+ENABLE_WHATSAPP_GATEWAY="false"
+WHATSAPP_PROVIDER="baileys"
+WHATSAPP_AUTH_DIR="/app/.whatsapp-auth"
+WHATSAPP_PRINT_QR="true"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required but not found on PATH."
   exit 1
@@ -14,7 +19,36 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "Optional: configure WhatsApp gateway for this run."
+read -r -p "Enable WhatsApp gateway now? [y/N]: " ENABLE_WA_INPUT
+ENABLE_WA_INPUT="${ENABLE_WA_INPUT:-N}"
+if [[ "${ENABLE_WA_INPUT,,}" == "y" || "${ENABLE_WA_INPUT,,}" == "yes" ]]; then
+  ENABLE_WHATSAPP_GATEWAY="true"
+  read -r -p "Provider (baileys/cloud-api) [baileys]: " WA_PROVIDER_INPUT
+  WA_PROVIDER_INPUT="${WA_PROVIDER_INPUT:-baileys}"
+  if [[ "$WA_PROVIDER_INPUT" == "baileys" || "$WA_PROVIDER_INPUT" == "cloud-api" ]]; then
+    WHATSAPP_PROVIDER="$WA_PROVIDER_INPUT"
+  else
+    echo "Invalid provider: $WA_PROVIDER_INPUT"
+    exit 1
+  fi
+
+  if [[ "$WHATSAPP_PROVIDER" == "baileys" ]]; then
+    read -r -p "Auth dir inside container [/app/.whatsapp-auth]: " WA_AUTH_DIR_INPUT
+    WHATSAPP_AUTH_DIR="${WA_AUTH_DIR_INPUT:-/app/.whatsapp-auth}"
+    read -r -p "Print WhatsApp QR in logs? [Y/n]: " WA_QR_INPUT
+    WA_QR_INPUT="${WA_QR_INPUT:-Y}"
+    if [[ "${WA_QR_INPUT,,}" == "n" || "${WA_QR_INPUT,,}" == "no" ]]; then
+      WHATSAPP_PRINT_QR="false"
+    fi
+  fi
+fi
+
 echo "Ensuring containers are up..."
+PI_ENABLE_WHATSAPP_GATEWAY="$ENABLE_WHATSAPP_GATEWAY" \
+PI_WHATSAPP_PROVIDER="$WHATSAPP_PROVIDER" \
+PI_WHATSAPP_AUTH_DIR="$WHATSAPP_AUTH_DIR" \
+PI_WHATSAPP_PRINT_QR="$WHATSAPP_PRINT_QR" \
 docker compose up -d --build app
 
 sleep 2
@@ -43,5 +77,14 @@ docker compose exec app /usr/bin/gh auth login -h github.com
 
 echo "Verifying GitHub auth..."
 docker compose exec app /usr/bin/gh auth status
+
+echo "WhatsApp gateway config used for this run:"
+echo "  PI_ENABLE_WHATSAPP_GATEWAY=$ENABLE_WHATSAPP_GATEWAY"
+echo "  PI_WHATSAPP_PROVIDER=$WHATSAPP_PROVIDER"
+echo "  PI_WHATSAPP_AUTH_DIR=$WHATSAPP_AUTH_DIR"
+echo "  PI_WHATSAPP_PRINT_QR=$WHATSAPP_PRINT_QR"
+if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" && "$WHATSAPP_PROVIDER" == "baileys" ]]; then
+  echo "Next step: scan the QR from container logs (docker compose logs -f app)."
+fi
 
 echo "Done."
