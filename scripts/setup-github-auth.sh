@@ -8,6 +8,7 @@ ENABLE_WHATSAPP_GATEWAY="false"
 WHATSAPP_PROVIDER="baileys"
 WHATSAPP_AUTH_DIR="/app/.whatsapp-auth"
 WHATSAPP_PRINT_QR="true"
+WHATSAPP_SELF_CHAT_MODE="false"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required but not found on PATH."
@@ -39,6 +40,12 @@ if [[ "$ENABLE_WA_LOWER" == "y" || "$ENABLE_WA_LOWER" == "yes" ]]; then
     WHATSAPP_AUTH_DIR="${WA_AUTH_DIR_INPUT:-/app/.whatsapp-auth}"
     # Always print QR so the user can scan it directly in the terminal
     WHATSAPP_PRINT_QR="true"
+    read -r -p "Enable self-chat mode (message yourself)? [y/N]: " WA_SELF_CHAT_INPUT
+    WA_SELF_CHAT_INPUT="${WA_SELF_CHAT_INPUT:-N}"
+    WA_SELF_CHAT_LOWER="$(printf '%s' "$WA_SELF_CHAT_INPUT" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$WA_SELF_CHAT_LOWER" == "y" || "$WA_SELF_CHAT_LOWER" == "yes" ]]; then
+      WHATSAPP_SELF_CHAT_MODE="true"
+    fi
   fi
 fi
 
@@ -82,6 +89,7 @@ if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" ]]; then
   PI_WHATSAPP_PROVIDER="$WHATSAPP_PROVIDER" \
   PI_WHATSAPP_AUTH_DIR="$WHATSAPP_AUTH_DIR" \
   PI_WHATSAPP_PRINT_QR="$WHATSAPP_PRINT_QR" \
+  PI_WHATSAPP_SELF_CHAT_MODE="$WHATSAPP_SELF_CHAT_MODE" \
   docker compose up -d app
 
   sleep 2
@@ -97,6 +105,7 @@ if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" ]]; then
   echo "  PI_WHATSAPP_PROVIDER=$WHATSAPP_PROVIDER"
   echo "  PI_WHATSAPP_AUTH_DIR=$WHATSAPP_AUTH_DIR"
   echo "  PI_WHATSAPP_PRINT_QR=$WHATSAPP_PRINT_QR"
+  echo "  PI_WHATSAPP_SELF_CHAT_MODE=$WHATSAPP_SELF_CHAT_MODE"
 
   if [[ "$WHATSAPP_PROVIDER" == "baileys" && "$WHATSAPP_PRINT_QR" == "true" ]]; then
     echo ""
