@@ -102,7 +102,12 @@ if [[ "$ENABLE_WHATSAPP_GATEWAY" == "true" ]]; then
     echo ""
     echo "Waiting for WhatsApp QR code — scan it with your phone (Ctrl+C to stop)..."
     echo ""
-    docker compose logs -f --no-log-prefix app
+    # Use --no-log-prefix if supported, fall back to plain -f otherwise
+    if docker compose logs --no-log-prefix --help >/dev/null 2>&1; then
+      docker compose logs -f --no-log-prefix app
+    else
+      docker compose logs -f app 2>&1 | sed 's/^[^ ]* | //'
+    fi
   else
     echo "Done."
   fi
