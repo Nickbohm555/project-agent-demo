@@ -54,5 +54,29 @@ describe("mapBaileysInbound", () => {
       }),
     ).toBeNull();
   });
-});
 
+  it("allows self-chat messages when enabled", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE2",
+          fromMe: true,
+          remoteJid: "15550001111@s.whatsapp.net",
+        },
+        message: {
+          conversation: "self chat ok",
+        },
+        messageTimestamp: 1_700_000_123,
+      },
+      { selfChatMode: true },
+    );
+
+    expect(mapped).toMatchObject({
+      id: "BAE2",
+      channel: "whatsapp",
+      conversationId: "15550001111@s.whatsapp.net",
+      userId: "15550001111@s.whatsapp.net",
+      text: "self chat ok",
+    });
+  });
+});

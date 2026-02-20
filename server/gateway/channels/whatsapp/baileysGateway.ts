@@ -47,6 +47,7 @@ const silentBaileysLogger = {
 type WhatsAppBaileysGatewayOptions = {
   authDir: string;
   printQr: boolean;
+  selfChatMode: boolean;
   gatewayRouter: GatewayRouter;
 };
 
@@ -227,7 +228,9 @@ export class WhatsAppBaileysGateway {
     const messages = payload.messages ?? [];
 
     for (const rawMessage of messages) {
-      const inbound = mapBaileysInbound(rawMessage as never);
+      const inbound = mapBaileysInbound(rawMessage as never, {
+        selfChatMode: this.options.selfChatMode,
+      });
       if (!inbound) {
         continue;
       }

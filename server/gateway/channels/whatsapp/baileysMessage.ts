@@ -47,8 +47,11 @@ export function extractBaileysText(raw: BaileysIncoming): string {
   ).trim();
 }
 
-export function mapBaileysInbound(raw: BaileysIncoming): InternalMessage | null {
-  if (raw.key?.fromMe) {
+export function mapBaileysInbound(
+  raw: BaileysIncoming,
+  options: { selfChatMode?: boolean } = {},
+): InternalMessage | null {
+  if (raw.key?.fromMe && !options.selfChatMode) {
     return null;
   }
 
@@ -81,4 +84,3 @@ export function mapBaileysInbound(raw: BaileysIncoming): InternalMessage | null 
     },
   };
 }
-

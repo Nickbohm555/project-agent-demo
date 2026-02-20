@@ -9,6 +9,7 @@ export type GatewayConfig = {
     autoStart: boolean;
     authDir: string;
     printQr: boolean;
+    selfChatMode: boolean;
     verifyToken: string | null;
     webhookValidateSignature: boolean;
   };
@@ -41,9 +42,9 @@ export function loadGatewayConfig(cwd: string = process.cwd()): GatewayConfig {
       autoStart: envFlag(process.env.PI_WHATSAPP_AUTO_START, true),
       authDir: process.env.PI_WHATSAPP_AUTH_DIR?.trim() || path.join(cwd, ".whatsapp-auth"),
       printQr: envFlag(process.env.PI_WHATSAPP_PRINT_QR, true),
+      selfChatMode: envFlag(process.env.PI_WHATSAPP_SELF_CHAT_MODE, false),
       verifyToken: process.env.WHATSAPP_VERIFY_TOKEN?.trim() || null,
       webhookValidateSignature: envFlag(process.env.WHATSAPP_WEBHOOK_VALIDATE_SIGNATURE, true),
     },
   };
 }
-

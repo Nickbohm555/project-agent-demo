@@ -50,6 +50,7 @@ const whatsappBaileysGateway =
     ? new WhatsAppBaileysGateway({
         authDir: gatewayConfig.whatsapp.authDir,
         printQr: gatewayConfig.whatsapp.printQr,
+        selfChatMode: gatewayConfig.whatsapp.selfChatMode,
         gatewayRouter,
       })
     : null;
