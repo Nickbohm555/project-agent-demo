@@ -49,16 +49,20 @@ export function extractBaileysText(raw: BaileysIncoming): string {
 
 export function mapBaileysInbound(
   raw: BaileysIncoming,
-  options: { selfChatMode?: boolean } = {},
+  options: { selfChatMode?: boolean; selfJid?: string | null } = {},
 ): InternalMessage | null {
   if (raw.key?.fromMe && !options.selfChatMode) {
     return null;
   }
 
-  const conversationId = String(raw.key?.remoteJid ?? "").trim();
-  if (!conversationId) {
+  const remoteJid = String(raw.key?.remoteJid ?? "").trim();
+  if (!remoteJid) {
     return null;
   }
+  const conversationId =
+    options.selfChatMode && options.selfJid && remoteJid.endsWith("@lid")
+      ? options.selfJid
+      : remoteJid;
 
   const text = extractBaileysText(raw);
   if (!text) {
@@ -66,7 +70,7 @@ export function mapBaileysInbound(
   }
 
   const sourceId = String(raw.key?.id ?? "").trim();
-  const userId = String(raw.key?.participant ?? raw.key?.remoteJid ?? "").trim();
+  const userId = String(raw.key?.participant ?? conversationId ?? "").trim();
   if (!userId) {
     return null;
   }

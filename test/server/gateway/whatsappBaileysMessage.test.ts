@@ -79,4 +79,25 @@ describe("mapBaileysInbound", () => {
       text: "self chat ok",
     });
   });
+
+  it("uses self jid for lid conversations in self-chat mode", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE3",
+          fromMe: true,
+          remoteJid: "219739787915460@lid",
+        },
+        message: {
+          conversation: "self chat lid",
+        },
+      },
+      { selfChatMode: true, selfJid: "15550001111@s.whatsapp.net" },
+    );
+
+    expect(mapped).toMatchObject({
+      conversationId: "15550001111@s.whatsapp.net",
+      userId: "15550001111@s.whatsapp.net",
+    });
+  });
 });

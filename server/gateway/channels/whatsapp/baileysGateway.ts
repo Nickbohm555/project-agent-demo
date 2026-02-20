@@ -239,6 +239,7 @@ export class WhatsAppBaileysGateway {
       );
       const inbound = mapBaileysInbound(rawMessage as never, {
         selfChatMode: this.options.selfChatMode,
+        selfJid: this.socket?.user?.id,
       });
       if (!inbound) {
         console.log("[gateway/whatsapp] message filtered out by mapBaileysInbound");
