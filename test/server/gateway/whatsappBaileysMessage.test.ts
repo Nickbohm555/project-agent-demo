@@ -122,4 +122,23 @@ describe("mapBaileysInbound", () => {
 
     expect(mapped?.text).toBe("wrapped text");
   });
+
+  it("falls back to conversation id when participant is blank", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE5",
+          fromMe: true,
+          remoteJid: "15550001111@s.whatsapp.net",
+          participant: "",
+        },
+        message: {
+          conversation: "self chat",
+        },
+      },
+      { selfChatMode: true },
+    );
+
+    expect(mapped?.userId).toBe("15550001111@s.whatsapp.net");
+  });
 });

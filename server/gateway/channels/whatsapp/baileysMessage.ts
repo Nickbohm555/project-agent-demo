@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { proto } from "@whiskeysockets/baileys";
-import { extractMessageContent, normalizeMessageContent } from "@whiskeysockets/baileys";
+import {
+  extractMessageContent,
+  getContentType,
+  normalizeMessageContent,
+} from "@whiskeysockets/baileys";
 import type { InternalMessage } from "../../core/message.js";
 
 type BaileysIncoming = {
@@ -97,12 +101,15 @@ export function mapBaileysInbound(
 
   const text = extractBaileysText(raw);
   if (!text) {
-    options.debug?.("missing_text", { remoteJid });
+    const normalized = normalizeMessageContent(raw.message as proto.IMessage | undefined);
+    const contentType = normalized ? getContentType(normalized) : undefined;
+    const messageKeys = normalized ? Object.keys(normalized) : Object.keys((raw.message ?? {}) as object);
+    options.debug?.("missing_text", { remoteJid, contentType, messageKeys });
     return null;
   }
 
   const sourceId = String(raw.key?.id ?? "").trim();
-  const userId = String(raw.key?.participant ?? conversationId ?? "").trim();
+  const userId = String(raw.key?.participant || conversationId || "").trim();
   if (!userId) {
     options.debug?.("missing_user_id", { remoteJid, conversationId });
     return null;
