@@ -241,14 +241,28 @@ export class WhatsAppBaileysGateway {
         selfChatMode: this.options.selfChatMode,
       });
       if (!inbound) {
+        console.log("[gateway/whatsapp] message filtered out by mapBaileysInbound");
         continue;
       }
 
-      const routeResult = await this.options.gatewayRouter.routeInbound(inbound);
-      if (routeResult.skipped || !routeResult.assistantText) {
-        continue;
+      try {
+        console.log(
+          `[gateway/whatsapp] routing message to agent: conversationId=${inbound.conversationId} text="${inbound.text.slice(0, 80)}"`,
+        );
+        const routeResult = await this.options.gatewayRouter.routeInbound(inbound);
+        console.log(
+          `[gateway/whatsapp] route result: skipped=${routeResult.skipped} runStatus=${routeResult.runStatus} hasAssistantText=${Boolean(routeResult.assistantText)}`,
+        );
+        if (routeResult.skipped || !routeResult.assistantText) {
+          continue;
+        }
+        await this.sendText(inbound.conversationId, routeResult.assistantText);
+        console.log("[gateway/whatsapp] reply sent successfully");
+      } catch (error) {
+        console.error(
+          `[gateway/whatsapp] error processing message: ${String(error)}`,
+        );
       }
-      await this.sendText(inbound.conversationId, routeResult.assistantText);
     }
   }
 
