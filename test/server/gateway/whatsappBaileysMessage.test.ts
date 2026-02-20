@@ -100,4 +100,26 @@ describe("mapBaileysInbound", () => {
       userId: "15550001111@s.whatsapp.net",
     });
   });
+
+  it("extracts text from wrapped messages", () => {
+    const mapped = mapBaileysInbound(
+      {
+        key: {
+          id: "BAE4",
+          fromMe: false,
+          remoteJid: "15550001111@s.whatsapp.net",
+        },
+        message: {
+          ephemeralMessage: {
+            message: {
+              extendedTextMessage: { text: "wrapped text" },
+            },
+          },
+        },
+      },
+      { selfChatMode: false },
+    );
+
+    expect(mapped?.text).toBe("wrapped text");
+  });
 });

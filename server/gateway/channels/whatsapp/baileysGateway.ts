@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import type { GatewayRouter } from "../../core/router.js";
-import { mapBaileysInbound } from "./baileysMessage.js";
+import { extractBaileysText, mapBaileysInbound } from "./baileysMessage.js";
 
 type ConnectionStatus = {
   running: boolean;
@@ -230,12 +230,11 @@ export class WhatsAppBaileysGateway {
     for (const rawMessage of messages) {
       const debug = rawMessage as {
         key?: { fromMe?: boolean; remoteJid?: string };
-        message?: { conversation?: string; extendedTextMessage?: { text?: string } };
+        message?: unknown;
       };
+      const extracted = extractBaileysText(debug as never);
       console.log(
-        `[gateway/whatsapp] message fromMe=${Boolean(debug.key?.fromMe)} remoteJid=${debug.key?.remoteJid ?? "unknown"} hasText=${Boolean(
-          debug.message?.conversation || debug.message?.extendedTextMessage?.text,
-        )}`,
+        `[gateway/whatsapp] message fromMe=${Boolean(debug.key?.fromMe)} remoteJid=${debug.key?.remoteJid ?? "unknown"} textLen=${extracted.length}`,
       );
       const inbound = mapBaileysInbound(rawMessage as never, {
         selfChatMode: this.options.selfChatMode,

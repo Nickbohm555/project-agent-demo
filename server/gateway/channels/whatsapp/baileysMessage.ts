@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { proto } from "@whiskeysockets/baileys";
+import { extractMessageContent, normalizeMessageContent } from "@whiskeysockets/baileys";
 import type { InternalMessage } from "../../core/message.js";
 
 type BaileysIncoming = {
@@ -8,12 +10,7 @@ type BaileysIncoming = {
     remoteJid?: string;
     participant?: string;
   };
-  message?: {
-    conversation?: string;
-    extendedTextMessage?: { text?: string };
-    imageMessage?: { caption?: string };
-    videoMessage?: { caption?: string };
-  };
+  message?: unknown;
   messageTimestamp?: number | LongLike;
 };
 
@@ -37,14 +34,42 @@ function normalizeTimestamp(value: unknown): string {
   return new Date().toISOString();
 }
 
+function unwrapMessage(message: proto.IMessage | undefined): proto.IMessage | undefined {
+  return normalizeMessageContent(message);
+}
+
 export function extractBaileysText(raw: BaileysIncoming): string {
-  return String(
-    raw.message?.conversation ??
-      raw.message?.extendedTextMessage?.text ??
-      raw.message?.imageMessage?.caption ??
-      raw.message?.videoMessage?.caption ??
-      "",
-  ).trim();
+  const message = unwrapMessage(raw.message as proto.IMessage | undefined);
+  if (!message) {
+    return "";
+  }
+  const extracted = extractMessageContent(message);
+  const candidates: Array<proto.IMessage | undefined> = [
+    message,
+    extracted && extracted !== message ? (extracted as proto.IMessage) : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    if (typeof candidate.conversation === "string" && candidate.conversation.trim()) {
+      return candidate.conversation.trim();
+    }
+    const extended = candidate.extendedTextMessage?.text;
+    if (extended?.trim()) {
+      return extended.trim();
+    }
+    const caption =
+      candidate.imageMessage?.caption ??
+      candidate.videoMessage?.caption ??
+      candidate.documentMessage?.caption;
+    if (caption?.trim()) {
+      return caption.trim();
+    }
+  }
+
+  return "";
 }
 
 export function mapBaileysInbound(
