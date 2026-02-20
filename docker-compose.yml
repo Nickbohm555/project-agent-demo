@@ -19,6 +19,9 @@ services:
       PI_LOG_CODEX_TOOL: ${PI_LOG_CODEX_TOOL:-true}
       PI_LOG_CODEX_ENV: ${PI_LOG_CODEX_ENV:-true}
       PI_LOG_CODEX_ENV_VERBOSE: ${PI_LOG_CODEX_ENV_VERBOSE:-true}
+      PI_CODEX_TIMEOUT_MS: ${PI_CODEX_TIMEOUT_MS:-120000}
+      PI_CODEX_IDLE_MS: ${PI_CODEX_IDLE_MS:-8000}
+      GIT_CONFIG_GLOBAL: /root/.config/git/config
     ports:
       - "43217:43217"
       - "43218:43218"
@@ -27,7 +30,7 @@ services:
       - /Users/nickbohm/Desktop/Projects:/Users/nickbohm/Desktop/Projects
       - /Users/nickbohm/.codex:/root/.codex
       - project_agent_demo_gh_config:/root/.config/gh
-      - /Users/nickbohm/.gitconfig:/root/.gitconfig:ro
+      - project_agent_demo_git_config:/root/.config/git
       - project_agent_demo_node_modules:/app/node_modules
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -35,4 +38,5 @@ services:
 
 volumes:
   project_agent_demo_gh_config:
+  project_agent_demo_git_config:
   project_agent_demo_node_modules:

@@ -34,4 +34,7 @@ COPY . .
 
 EXPOSE 43217 43218
 
+RUN chmod +x /app/docker/entrypoint.sh
+
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["pnpm", "dev"]
